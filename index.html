@@ -632,6 +632,11 @@ function migrate(s) {
     delete s.debt; delete s.apr; s.v = 2;
   }
   sanitize(s);
+  // An older statement reader took the summary line "Баланс на 12.11.26 −219 499,52" for a spend: such rows
+  // (their note is exactly what is left of that line) are dropped. Interest and bank fees it imported as
+  // everyday spending move to "Проценты и комиссии" and count as obligatory, not as money spent on living.
+  s.spends = s.spends.filter(x => !(x.note && /^(баланс|остаток|задолженность) на( •.*)?$/i.test(x.note.trim())));
+  for (const x of s.spends) if (!x.planned && x.cat === 'Другое' && x.note && BANK_FEE.test(x.note.trim())) { x.planned = true; x.cat = BANK_CAT; }
   const total = s.debts.reduce((a, d) => a + (+d.balance || 0), 0);
   if (!(+s.debtStart > 0)) s.debtStart = total + (+s.potUsed || 0);
   if (!s.scen || typeof s.scen !== 'object') s.scen = s.onboarded ? { debt: s.debts.length > 0, save: s.goals.length > 0, irregular: s.payMode === 'manual' } : null;
@@ -1597,6 +1602,7 @@ function parseCsv(text) {
 //  - spends carry "-", income is bare: only the minuses are spends.
 // Interest and transfers between the person's own accounts are listed but left unticked:
 // interest is already counted in the debt, and a transfer is not money spent.
+const BANK_CAT = 'Проценты и комиссии', BANK_FEE = /^(проценты по|плата за|комисси|штраф|пени|неустойк)/i;
 const SKIP_DESC = [[/процент/i, 'проценты, уже в долге'], [/(внутренн\S* перевод|перевод (между|на) (сво|договор|сч[её]т))/i, 'перевод между своими счетами']];
 function finishRows(items) {
   items = items.filter(r => r && r.date && r.amount);
@@ -1605,7 +1611,8 @@ function finishRows(items) {
   const seen = new Set(S.spends.map(x => x.date + '|' + Math.round(x.amount)));
   return items.slice(0, 300).map(r => {
     const dup = seen.has(r.date + '|' + Math.round(r.amount)), why = (SKIP_DESC.find(([re]) => re.test(r.desc)) || [])[1] || '';
-    return { ...r, id: uid(), on: !dup && !why, dup, why, cat: 'Другое' };
+    const bank = BANK_FEE.test(r.desc);
+    return { ...r, id: uid(), on: !dup && !why, dup, why, bank, cat: bank ? BANK_CAT : 'Другое' };
   });
 }
 function parseOfx(text) {
@@ -1735,7 +1742,7 @@ function csvPreview() {
       <span class="num">${fmtD(parse(r.date))}</span>
       <span class="desc" title="${esc(r.desc)}">${esc(r.desc) || '—'}${r.dup ? ' <span class="tag">уже есть</span>' : r.why ? ` <span class="tag">${r.why}</span>` : ''}</span>
       <span class="num" style="text-align:right">${rub(r.amount)}</span>
-      <select data-csv-cat="${r.id}" aria-label="Категория">${allCats().map(c => `<option ${c === r.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      <select data-csv-cat="${r.id}" aria-label="Категория">${[...new Set([r.cat, ...allCats()])].map(c => `<option ${c === r.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
     </div>`).join('')}</div>
     <label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="csvDeduct" ${csvDeduct ? 'checked' : ''}>Вычесть эти суммы из баланса карты</label>
     <p class="note">Обычно не нужно: если баланс уже сверен с банком, эти траты в нём учтены.</p>
@@ -2148,7 +2155,7 @@ document.addEventListener('click', e => {
   if (d.csvGo) {
     const on = csvRows.filter(r => r.on); const sum = on.reduce((a, r) => a + r.amount, 0);
     undoable(`Добавлено ${on.length} ${plural(on.length,'трата','траты','трат')}`, () => {
-      for (const r of on) S.spends.push({ id: uid(), date: r.date, amount: r.amount, cat: r.cat, ...(r.desc ? { note: String(r.desc).slice(0, 60) } : {}) });
+      for (const r of on) S.spends.push({ id: uid(), date: r.date, amount: r.amount, cat: r.cat, ...(r.desc ? { note: String(r.desc).slice(0, 60) } : {}), ...(r.bank && r.cat === BANK_CAT ? { planned: true } : {}) });
       if (csvDeduct) S.balance -= sum;
       csvRows = null; csvMeta = null;
     }); return;
