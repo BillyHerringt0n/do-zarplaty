@@ -117,6 +117,10 @@ main{max-width:1040px;margin:0 auto}
 .stats .s{font-size:12px;color:var(--muted)}
 .stats .linkbtn{font-size:12px;white-space:normal;text-align:left;align-self:flex-start;line-height:1.3}
 .editbal{display:flex;gap:6px}
+textarea{font:inherit;font-size:13px;width:100%;border:1px solid var(--line);border-radius:10px;background:var(--sunk);color:var(--ink);padding:8px 10px;resize:vertical}
+.restore summary{cursor:pointer;color:var(--muted);font-size:14px}
+.restore[open]{display:flex;flex-direction:column}
+.restore textarea{margin-top:8px}
 .cardline{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--sunk);font-size:14px}
 .cardline>svg{margin-top:2px;color:var(--muted)}
 .cardline b{font-weight:600}
@@ -485,7 +489,7 @@ input.slider:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1.08)}
 
 <script>
 const DEFAULT = {
-  v: 2, onboarded: false, balance: 0, usdRate: 80, eurRate: 90, ratesAt: '', ratesAuto: false, cele: null, paydays: [], skip: 0,
+  v: 3, onboarded: false, balance: 0, usdRate: 80, eurRate: 90, ratesAt: '', ratesAuto: false, cele: null, paydays: [], skip: 0,
   planMonthly: 0, potUsed: 0, reserve: 0, debtStart: 0,
   cats: ['Еда', 'Транспорт', 'Другое'], catLimits: {}, quick: [],
   debts: [], goals: [], bills: [], habits: [], oneoffs: [], entries: [], spends: [], limits: {},
@@ -567,19 +571,26 @@ function toast(t, action) {
   if (action) { const b = document.createElement('button'); b.textContent = action.label; b.onclick = () => { el.hidden = true; action.fn(); }; el.appendChild(b); }
   el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, action ? 5000 : 2400);
 }
+let rev = 0;   // counts saved changes, so an undo can tell whether something else happened after it
 function undoable(msg, mutate) {
   const before = JSON.stringify(S); mutate();
-  commit(); toast(msg, { label: 'Вернуть', fn: () => { S = migrate(JSON.parse(before)); commit('Вернул'); } });
+  commit(); const mine = rev;
+  toast(msg, { label: 'Вернуть', fn: () => {
+    if (rev !== mine) { toast('Уже не вернуть: после этого были другие изменения'); return; }
+    S = migrate(JSON.parse(before)); commit('Вернул');
+  } });
 }
 
 /* ---------- data shape ---------- */
+const MAX_SPENDS = 1500;
 // Everything loaded from storage, the cabinet or an imported file passes through sanitize():
 // ids become plain tokens, numbers are clamped, dates validated, text trimmed. Nothing from a
 // file reaches the page markup unchecked, and list sizes stay bounded.
-const sid = v => String(v ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || uid();
+const BAD_KEY = /^(__proto__|constructor|prototype)$/;
+const sid = v => { const x = String(v ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24); return x && !BAD_KEY.test(x) ? x : uid(); };
 const snum = (v, min = 0, max = 1e12) => { const n = +v; return isFinite(n) ? Math.min(max, Math.max(min, n)) : 0; };
 const sstr = (v, n = 60) => String(v ?? '').slice(0, n);
-const sdate = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v)) && !isNaN(parse(String(v))) ? String(v) : '';
+const sdate = v => { const x = String(v ?? ''); if (!/^\d{4}-\d{2}-\d{2}$/.test(x)) return ''; const d = parse(x); return !isNaN(d) && ymd(d) === x ? x : ''; };   // 2026-02-31 is refused
 const sarr = (a, max) => (Array.isArray(a) ? a : []).filter(x => x && typeof x === 'object').slice(-max);
 function sanitize(s) {
   s.balance = snum(s.balance, -1e12); s.usdRate = snum(s.usdRate, 0, 1e6) || 80; s.eurRate = snum(s.eurRate, 0, 1e6) || 90; s.ratesAt = sdate(s.ratesAt); s.ratesAuto = !!s.ratesAuto;
@@ -589,7 +600,7 @@ function sanitize(s) {
   s.payMode = ['days', 'weekly', 'biweekly', 'manual'].includes(s.payMode) ? s.payMode : 'days';
   s.payWeekday = Math.round(snum(s.payWeekday, 0, 6)); s.payAnchor = sdate(s.payAnchor); s.payNext = sdate(s.payNext);
   s.cats = [...new Set((Array.isArray(s.cats) ? s.cats : []).map(c => sstr(c, 24).trim()).filter(Boolean))].slice(0, 30);
-  const cl = {}; for (const k of Object.keys(s.catLimits || {}).slice(0, 60)) { const v = snum(s.catLimits[k]); if (v > 0) cl[sstr(k, 24)] = v; } s.catLimits = cl;
+  const cl = {}; for (const k of Object.keys(s.catLimits || {}).slice(0, 60)) { const v = snum(s.catLimits[k]), key = sstr(k, 24); if (v > 0 && !BAD_KEY.test(key)) cl[key] = v; } s.catLimits = cl;
   const lm = {}; for (const k of Object.keys(s.limits || {}).sort().slice(-70)) if (sdate(k)) lm[k] = snum(s.limits[k]); s.limits = lm;
   const paid = a => (Array.isArray(a) ? a : []).filter(x => /^\d{4}-\d{2}$/.test(String(x))).slice(-24);
   const day = v => { const n = Math.round(+v); return n >= 1 && n <= 31 ? n : 0; };   // 0 = date not set yet
@@ -604,20 +615,23 @@ function sanitize(s) {
   s.habits = sarr(s.habits, 30).map(h => ({ id: sid(h.id), name: sstr(h.name, 24), amount: snum(h.amount), every: snum(h.every, 0.5, 365) || 1 }));
   s.oneoffs = sarr(s.oneoffs, 60).map(o => ({ id: sid(o.id), name: sstr(o.name, 40), amount: snum(o.amount), date: sdate(o.date), paid: !!o.paid }));
   s.quick = sarr(s.quick, 12).map(q => ({ id: sid(q.id), label: sstr(q.label, 24), amount: snum(q.amount), cat: sstr(q.cat, 24) }));
-  s.entries = sarr(s.entries, 400).map(e => ({ id: sid(e.id), date: sdate(e.date) || ymd(today0()), kind: KINDS[e.kind] ? e.kind : 'salary', cur: e.cur === 'USD' || e.cur === 'EUR' ? e.cur : 'RUB',
+  s.entries = sarr(s.entries, 400).filter(e => sdate(e.date)).map(e => ({ id: sid(e.id), date: sdate(e.date) || ymd(today0()), kind: KINDS[e.kind] ? e.kind : 'salary', cur: e.cur === 'USD' || e.cur === 'EUR' ? e.cur : 'RUB',
     earned: snum(e.earned), saved: snum(e.saved), free: snum(e.free), rate: snum(e.rate, 0, 1e6), ...(e.goalId ? { goalId: sid(e.goalId) } : {}) }));
-  s.spends = sarr(s.spends, 1200).map(x => ({ id: sid(x.id), date: sdate(x.date) || ymd(today0()), amount: snum(x.amount), cat: sstr(x.cat, 24) || 'Другое',
+  s.spends = sarr([...(Array.isArray(s.spends) ? s.spends : [])].filter(x => x && typeof x === 'object').sort((a, b) => String(a.date) < String(b.date) ? -1 : String(a.date) > String(b.date) ? 1 : 0), MAX_SPENDS).filter(x => sdate(x.date)).map(x => ({ id: sid(x.id), date: sdate(x.date) || ymd(today0()), amount: snum(x.amount), cat: sstr(x.cat, 24) || 'Другое',
     ...(x.note ? { note: sstr(x.note, 60) } : {}), ...(x.planned ? { planned: true } : {}),
-    ...(x.ref && typeof x.ref === 'object' && ['bill', 'debt', 'one'].includes(x.ref.t) ? { ref: { t: x.ref.t,id: sid(x.ref.id), key: sstr(x.ref.key, 7).replace(/[^\d-]/g, '') } } : {}) }));
+    ...(x.ref && typeof x.ref === 'object' && ['bill', 'debt', 'one'].includes(x.ref.t) ? { ref: { t: x.ref.t,id: sid(x.ref.id), key: sstr(x.ref.key, 7).replace(/[^\d-]/g, ''), ...(+x.ref.princ > 0 ? { princ: snum(x.ref.princ) } : {}) } } : {}) }));
   if (s.scen && typeof s.scen === 'object') s.scen = { debt: !!s.scen.debt, save: !!s.scen.save, irregular: !!s.scen.irregular }; else s.scen = null;
   s.onboarded = !!s.onboarded; delete s.isDebt;
   return s;
 }
 // Key order differs between this page and the store, so compare data in a stable form.
 const canon = o => JSON.stringify(o, (k, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v).sort().reduce((a, x) => (a[x] = v[x], a), {}) : v);
+const KNOWN_KEYS = [...Object.keys(DEFAULT), 'payCard', 'cardSeen', 'cardDebtSeen', 'debt', 'apr'];
 function migrate(s) {
-  const ver = +(s && s.v) || 1;
-  s = Object.assign(clone(DEFAULT), s || {}); s.v = ver;
+  const src = s && typeof s === 'object' && !Array.isArray(s) ? s : {}, ver = +src.v || 1;
+  s = clone(DEFAULT);
+  for (const k of KNOWN_KEYS) if (Object.prototype.hasOwnProperty.call(src, k)) s[k] = src[k];
+  s.v = ver;
   for (const k of ['debts','goals','bills','habits','oneoffs','entries','spends','quick','cats']) if (!Array.isArray(s[k])) s[k] = clone(DEFAULT[k]);
   for (const k of ['debts','goals','bills','habits','oneoffs','entries','spends','quick']) s[k] = s[k].filter(x => x && typeof x === 'object' && !Array.isArray(x));
   if (!s.catLimits || typeof s.catLimits !== 'object') s.catLimits = {};
@@ -631,15 +645,19 @@ function migrate(s) {
     }
     s.bills = s.bills.filter(b => !b.isDebt);
     if (!s.quick.length) s.quick = s.habits.map(h => ({ id: uid(), label: h.name, amount: +h.amount || 0, cat: h.name }));
-    delete s.debt; delete s.apr; s.v = 2;
+    s.v = 2;
   }
+  delete s.debt; delete s.apr;
   sanitize(s);
-  // An older statement reader took the summary line "Баланс на 12.11.26 −219 499,52" for a spend: such rows
-  // (their note is exactly what is left of that line) are dropped. Interest and bank fees it imported as
-  // everyday spending move to "Проценты и комиссии" and count as obligatory, not as money spent on living.
-  s.spends = s.spends.filter(x => !(x.note && (/^(баланс|остаток|задолженность) на( •.*)?$/i.test(x.note.trim())
-    || (!x.planned && x.cat === 'Другое' && /^(баланс|остаток|задолженность|кредитный лимит)\s+на(?=\s|$)(?!\s*(телефон|сч[её]т|карт))/i.test(x.note.trim())))));
-  for (const x of s.spends) if (!x.planned && x.cat === 'Другое' && x.note && BANK_FEE.test(x.note.trim())) { x.planned = true; x.cat = BANK_CAT; }
+  if (s.v < 3) {
+    // Once only: an older statement reader took the summary line "Баланс на 12.11.26 −219 499,52" for a spend
+    // (its note is exactly what was left of that line), and imported the bank's interest and service fees as
+    // everyday spending. Only those exact leftovers are touched, never notes a person typed.
+    s.spends = s.spends.filter(x => !(x.note && /^(баланс|остаток|задолженность) на( •.*)?$/i.test(x.note.trim())));
+    const OLD_FEE = /^(проценты по кредиту|плата за (оповещения об операциях|предоставление услуги|программу страховой защиты|обслуживание (карты|сч[её]та)))$/i;
+    for (const x of s.spends) if (!x.planned && x.cat === 'Другое' && x.note && OLD_FEE.test(x.note.trim())) { x.planned = true; x.cat = BANK_CAT; }
+    s.v = 3;
+  }
   const total = s.debts.reduce((a, d) => a + (+d.balance || 0), 0);
   if (!(+s.debtStart > 0)) s.debtStart = total + (+s.potUsed || 0);
   if (!s.scen || typeof s.scen !== 'object') s.scen = s.onboarded ? { debt: s.debts.length > 0, save: s.goals.length > 0, irregular: s.payMode === 'manual' } : null;
@@ -658,8 +676,11 @@ function syncCard() {
   const d = payCardDebt();
   if (d) {
     const seenBal = +S.cardSeen, seenDebt = +S.cardDebtSeen, debtNow = +d.balance || 0;
-    if (+d.limit > 0 && isFinite(seenDebt) && Math.abs(debtNow - seenDebt) >= 0.005) S.balance = r2(S.balance - (debtNow - seenDebt));
-    else if (isFinite(seenBal)) {
+    if (+d.limit > 0) {
+      if (isFinite(seenDebt) && Math.abs(debtNow - seenDebt) >= 0.005) S.balance = r2(S.balance - (debtNow - seenDebt));
+      else if (isFinite(seenBal) && S.balance > seenBal && +d.graceLeft > 0) d.graceLeft = Math.max(0, r2(d.graceLeft - (S.balance - seenBal)));
+      d.balance = Math.max(0, r2(d.limit - S.balance));
+    } else if (isFinite(seenBal)) {
       const delta = seenBal - S.balance;
       if (Math.abs(delta) >= 0.005) {
         d.balance = Math.max(0, r2(debtNow + delta));
@@ -669,12 +690,15 @@ function syncCard() {
   }
   cardMark();
 }
+const UNLINKED = 'Карта больше не следит за тратами: «На карте» теперь твои деньги. Сверь баланс с банком';
 function cardMark() { const d = payCardDebt(); S.cardSeen = S.balance; S.cardDebtSeen = d ? +d.balance || 0 : 0; }
 // What a debt takes out of the money until payday. For the card being paid with, the minimum payment is
 // made by topping the card up from income or savings, so only the bank's interest comes out of it.
 function dueAmt(d) {
-  if (S.payCard === d.id && d.kind === 'card') return Math.round(+d.apr > 0 ? (+d.balance || 0) * d.apr / 1200 : d.io ? +d.min || 0 : 0);
-  return +d.min || 0;
+  const bal = +d.balance || 0; if (!(bal > 0)) return 0;
+  if (S.payCard === d.id && d.kind === 'card') return Math.round(+d.apr > 0 ? bal * d.apr / 1200 : d.io ? +d.min || 0 : 0);
+  const interest = +d.apr > 0 ? bal * d.apr / 1200 : d.io ? +d.min || 0 : 0;
+  return Math.round(Math.min(+d.min || 0, bal + interest));
 }
 const totalDebt = () => S.debts.reduce((a, d) => a + Math.max(0, +d.balance || 0), 0);
 
@@ -713,7 +737,7 @@ function paydaysByDays(t, count) {
   if (!days.length) return out;
   for (let k = 0; out.length < count && k < 24; k++) {
     const first = new Date(t.getFullYear(), t.getMonth() + k, 1), Y = first.getFullYear(), M = first.getMonth();
-    for (const d of days) { const dt = new Date(Y, M, Math.min(d, dim(Y, M))); if (dt > t && out.length < count) out.push(dt); }
+    for (const d of days) { const dt = new Date(Y, M, Math.min(d, dim(Y, M))); if (dt > t && out.length < count && !out.some(x => +x === +dt)) out.push(dt); }
   }
   return out;
 }
@@ -748,13 +772,16 @@ function calc(skip = S.skip) {
   const skipped = pays.slice(0, skip);
   const days = Math.max(1, diffDays(t, target));
   const events = []; let billsSum = 0;
-  for (const b of S.bills) for (const o of dueDates(b, t, target, true)) {
+  const ps = periodStart(t), from = ps < t ? ps : t;
+  for (const b of S.bills) for (const o of dueDates(b, from, target, true)) {
+    const past = o.date < t; if (past && o.paid) continue;
     if (!o.paid) billsSum += +b.amount || 0;
-    events.push({ date: o.date, what: b.name, amount: +b.amount || 0, bill: b, key: o.key, done: o.paid });
+    events.push({ date: o.date, what: b.name, amount: +b.amount || 0, bill: b, key: o.key, done: o.paid, overdue: past });
   }
-  for (const d of S.debts) { const amt = dueAmt(d); if (amt > 0) for (const o of dueDates(d, t, target, true)) {
+  for (const d of S.debts) { const amt = dueAmt(d); if (amt > 0) for (const o of dueDates(d, from, target, true)) {
+    const past = o.date < t; if (past && (o.paid || S.payCard === d.id)) continue;
     if (!o.paid) billsSum += amt;
-    events.push({ date: o.date, what: d.name, sub: S.payCard === d.id ? 'проценты банка, спишутся с карты' : 'мин. платёж', amount: amt, debt: d, key: o.key, done: o.paid });
+    events.push({ date: o.date, what: d.name, sub: S.payCard === d.id ? 'проценты банка, спишутся с карты' : 'мин. платёж', amount: amt, debt: d, key: o.key, done: o.paid, overdue: past });
   } }
   let habitsSum = 0; const habitRows = [];
   for (const h of S.habits) {
@@ -855,7 +882,7 @@ function simulate(extra, applyPot = true) {
       if (d.pay && drain) d.bal = Math.min(d.limit, d.bal + drain);
       const interest = d.r > 0 ? d.bal * d.r : d.io ? d.min : 0;
       interestTotal += interest; d.bal += interest;
-      if (d.pay) { const pay = Math.max(0, Math.min(d.bal, d.min, pool)); d.bal -= pay; pool -= pay; continue; }
+      if (d.pay) { const pay = Math.min(d.bal, d.min); d.bal -= pay; pool -= Math.min(pay, Math.max(0, pool)); continue; }
       const pay = Math.min(d.bal, d.min); d.bal -= pay; pool += d.min - pay;
     }
     for (const o of order()) { const d = ds.find(x => x.id === o.id); const p = Math.min(pool, d.bal); d.bal -= p; pool -= p; if (d.bal <= 0.5) { d.bal = 0; closes.push({ name: d.name, m }); } }
@@ -1584,10 +1611,16 @@ function renderProfile() {
         <h2>Резервная копия</h2>
         <p class="note">Файл со всеми данными. Пригодится, чтобы перенести их в другое приложение или восстановить.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button id="exportBtn">${ic('in')}Скачать копию</button>
-          <label class="btnlike" for="importFile">${ic('out')}Загрузить из файла</label>
+          <button id="exportBtn">${ic('in')}${TG ? 'Сделать копию' : 'Скачать копию'}</button>
+          <label class="btnlike" for="importFile" tabindex="0" role="button">${ic('out')}Загрузить из файла</label>
           <input id="importFile" type="file" accept="application/json,.json" hidden>
         </div>
+        ${exportText ? `<label class="f"><span>Копия данных — выдели и скопируй</span><textarea id="exportBox" rows="5" readonly>${esc(exportText)}</textarea></label><button data-export-hide="1" style="align-self:flex-start">Скрыть</button>` : ''}
+        ${cloudTorn ? `<div class="banner bad">${ic('alert')}<div><b>Копия в облаке повреждена</b><p class="note">Похоже, сохранение на другом устройстве прервалось. Лучше открыть приложение на том устройстве — оно восстановит облако само. Если его нет, можно записать в облако данные с этого телефона: всё, что было только на другом устройстве, пропадёт.</p><button class="danger" data-cloud-restore="1" style="margin-top:8px">Записать в облако данные с этого телефона</button></div></div>` : ''}
+        <details class="restore"><summary>Восстановить из текста копии</summary>
+          <textarea id="restoreText" rows="4" placeholder="Вставь сюда текст копии" aria-label="Текст копии"></textarea>
+          <button id="restoreBtn" style="align-self:flex-start;margin-top:8px">${ic('out')}Восстановить</button>
+        </details>
       </div>
       <div class="card">
         <h2>Настройка</h2>
@@ -1607,12 +1640,34 @@ function renderProfile() {
 }
 
 /* ---------- CSV import ---------- */
-function parseNum(s) { const v = String(s ?? '').replace(/[\s  ₽$€]|RUB|руб\.?|р\./gi, '').replace(/[−–]/g, '-').replace(',', '.'); return v === '' || isNaN(+v) ? null : +v; }
-function parseDateStr(s) {
-  s = String(s || '').trim(); let m;
-  if ((m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2,4})/))) { const y = +m[3] < 100 ? 2000 + +m[3] : +m[3]; return `${y}-${pad(+m[2])}-${pad(+m[1])}`; }
-  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return `${m[1]}-${m[2]}-${m[3]}`;
-  return null;
+// Numbers as banks print them: "1 234,56", "-1,200.00", "1.234,56", "(1 200,00)", "12.50 USD", "1 234,56 р".
+function parseNum(s) {
+  let v = String(s ?? '').trim(); if (!v) return null;
+  const paren = /^\(.*\)$/.test(v); if (paren) v = v.slice(1, -1);
+  v = v.replace(/[−–]/g, '-').replace(/RUB|RUR|USD|EUR|руб\.?|р\.?|[₽$€]/gi, '').replace(/[\s  ']/g, '');
+  const lc = v.lastIndexOf(','), ld = v.lastIndexOf('.');
+  if (lc >= 0 && ld >= 0) v = lc > ld ? v.replace(/\./g, '').replace(',', '.') : v.replace(/,/g, '');   // the last mark is the decimal one
+  else if (lc >= 0) v = (v.match(/,/g) || []).length > 1 ? v.replace(/,/g, '') : v.replace(',', '.');
+  else if ((v.match(/\./g) || []).length > 1) v = v.replace(/\./g, '');
+  if (!/^[+-]?\d+(\.\d+)?$/.test(v)) return null;
+  const n = +v; return paren ? -Math.abs(n) : n;
+}
+// Dates: 17.11.2026, 17.11.26, 2026-11-17, 17/11/2026. With "/" the order can be day/month (Russia) or
+// month/day (US exports, QIF): the caller passes what the file uses; impossible dates are refused.
+function parseDateStr(s, order) {
+  s = String(s || '').trim(); let m, y, mo, d;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else if ((m = s.match(/^(\d{1,2})([./-])(\d{1,2})\2(\d{4}|\d{2})(?!\d)/))) {
+    const a = +m[1], b = +m[3]; y = +m[4] < 100 ? 2000 + +m[4] : +m[4];
+    if (order === 'mdy' && m[2] === '/') { mo = a; d = b; } else { d = a; mo = b; }
+  } else return null;
+  if (!(mo >= 1 && mo <= 12) || !(d >= 1 && d <= dim(y, mo - 1))) return null;
+  return `${y}-${pad(mo)}-${pad(d)}`;
+}
+// For "a/b/yyyy" dates in one file: a part above 12 tells which one is the day.
+function slashOrder(vals, fallback) {
+  for (const v of vals) { const m = String(v || '').trim().match(/^(\d{1,2})\/(\d{1,2})\//); if (!m) continue; if (+m[1] > 12) return 'dmy'; if (+m[2] > 12) return 'mdy'; }
+  return fallback || 'dmy';
 }
 function splitCsv(line, sep) {
   const out = []; let cur = '', q = false;
@@ -1623,77 +1678,149 @@ function splitCsv(line, sep) {
   }
   out.push(cur); return out.map(x => x.trim());
 }
+// Splits a CSV into records; a line break inside quotes belongs to the field.
+function csvRecords(text) {
+  const out = []; let cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') q = !q;
+    if (!q && (ch === '\n' || ch === '\r')) { if (ch === '\r' && text[i + 1] === '\n') i++; out.push(cur); cur = ''; continue; }
+    cur += q && (ch === '\n' || ch === '\r') ? ' ' : ch;
+  }
+  out.push(cur); return out.filter(l => l.trim());
+}
+const ROW_SUMMARY = /^(исходящ\S*|входящ\S*)?\s*(остаток|баланс|итого|сальдо)/i;
 function parseCsv(text) {
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim());
+  const lines = csvRecords(text.replace(/^﻿/, ''));
   if (lines.length < 2) return [];
-  // Bank exports often start with a few lines of account details: find the table's header row.
-  let hi = lines.slice(0, 40).findIndex(l => /дата|date/i.test(l) && /сумм|amount/i.test(l)); if (hi < 0) hi = 0;
-  const hl = lines[hi], sep = (hl.match(/;/g) || []).length >= (hl.match(/,/g) || []).length ? ';' : ((hl.match(/\t/g) || []).length > (hl.match(/,/g) || []).length ? '\t' : ',');
-  const head = splitCsv(hl, sep).map(h => h.toLowerCase());
-  const find = re => head.findIndex(h => re.test(h));
-  let di = find(/дата операции|^дата|date/), ai = find(/сумма операции|^сумма|amount|сумма/), ti = find(/описание|назначение|description|получатель|merchant|категория/);
+  const sepOf = l => { const c = ch => (l.match(new RegExp(ch === '\t' ? '\\t' : '\\' + ch, 'g')) || []).length, n = { ';': c(';'), '\t': c('\t'), ',': c(',') };
+    return Object.keys(n).sort((a, b) => n[b] - n[a] || ';\t,'.indexOf(a) - ';\t,'.indexOf(b))[0]; };
+  const MONEYCOL = /сумм|amount|дебет|кредит|расход|приход|списан|поступлен|зачислен|debit|credit/i;
+  // Bank exports often start with account details: the header is the first line with a date column and a money
+  // column, at least three cells, and a date in that column on one of the next rows.
+  let hi = -1, sep = ';', head = [];
+  for (let i = 0; i < Math.min(lines.length - 1, 40); i++) {
+    const l = lines[i]; if (!/дата|date/i.test(l) || !MONEYCOL.test(l)) continue;
+    const sp = sepOf(l), h = splitCsv(l, sp).map(x => x.toLowerCase()); if (h.length < 3) continue;
+    const di = h.findIndex(x => /дата|date/.test(x));
+    if (lines.slice(i + 1, i + 4).some(r => parseDateStr(splitCsv(r, sp)[di], 'dmy') || parseDateStr(splitCsv(r, sp)[di], 'mdy'))) { hi = i; sep = sp; head = h; break; }
+  }
+  if (hi < 0) { hi = 0; sep = sepOf(lines[0]); head = splitCsv(lines[0], sep).map(x => x.toLowerCase()); }
+  const find = (...res) => { for (const re of res) { const i = head.findIndex(h => re.test(h)); if (i >= 0) return i; } return -1; };
+  const NOT_MONEY = /номер|сч[её]т|карт|документ|код|референс|mcc|id|кэшб|бонус|комисси|остаток|баланс/;
+  let di = find(/дата операции/, /^дата$/, /^дата/, /date/);
+  let ai = find(/сумма в валюте сч[её]та|сумма платежа|в валюте карты|пересчитан/, /сумма операции/, /^сумма$/, /^сумма|amount/);
+  if (ai >= 0 && NOT_MONEY.test(head[ai]) && !/^сумма/.test(head[ai])) ai = -1;
+  const deb = find(/^(дебет|расход|списани[ея]|debit|withdraw)/, /(расход|списан)/), cred = find(/^(кредит|приход|поступлени[ея]|зачислени[ея]|credit|deposit)/, /(приход|поступлен|зачислен)/);
+  const ti = find(/описание|назначение|description|details|memo|наименование операции/, /получатель|контрагент|merchant|payee|место/, /категория|category/);
+  const st = find(/статус|status/), ty = find(/тип операции|направлени|^тип$|^type$/);
   const rows = lines.slice(hi + 1).map(l => splitCsv(l, sep));
   if (!rows.length) return [];
-  if (di < 0) di = rows[0].findIndex(v => parseDateStr(v));
-  if (ai < 0) ai = rows[0].findIndex((v, i) => i !== di && parseNum(v) !== null);
-  if (di < 0 || ai < 0) return [];
-  return finishRows(rows.map(r => ({ date: parseDateStr(r[di]), amount: parseNum(r[ai]), plus: /^\s*\+/.test(r[ai] || ''), desc: ti >= 0 ? r[ti] : '' })));
+  if (di < 0) di = rows[0].findIndex(v => parseDateStr(v, 'dmy'));
+  const split = ai < 0 && (deb >= 0 || cred >= 0);
+  if (ai < 0 && !split) ai = rows[0].findIndex((v, i) => i !== di && !NOT_MONEY.test(head[i] || '') && String(v).replace(/\D/g, '').length <= 12 && parseNum(v) !== null);
+  if (di < 0 || (ai < 0 && !split)) return [];
+  const order = slashOrder(rows.map(r => r[di]), 'dmy');
+  return finishRows(rows.map(r => {
+    const desc = ti >= 0 ? r[ti] : '';
+    if (st >= 0 && /fail|отклон|отмен|declin|error|ошиб/i.test(r[st] || '')) return null;
+    if (ROW_SUMMARY.test(desc || '')) return null;
+    let amount, plus = false, income = false;
+    if (split) {
+      const out = deb >= 0 ? Math.abs(parseNum(r[deb]) || 0) : 0, inn = cred >= 0 ? Math.abs(parseNum(r[cred]) || 0) : 0;
+      if (out > 0) amount = -out; else if (inn > 0) { amount = inn; income = true; } else return null;
+    } else { amount = parseNum(r[ai]); plus = /^\s*\+/.test(r[ai] || ''); }
+    if (ty >= 0) { const tv = String(r[ty] || ''); if (/пополн|зачисл|поступл|приход|income|credit|возврат/i.test(tv)) income = true; else if (/списан|расход|покупк|debit|оплат/i.test(tv) && amount > 0) amount = -amount; }
+    return { date: parseDateStr(r[di], order), amount, plus, income, desc };
+  }));
 }
-// Signed amounts in, spends out. Banks mark direction in one of two ways:
+// Signed amounts in, spends out. Banks mark direction in one of these ways:
 //  - income has an explicit "+", spends are bare (or "-"): everything without "+" is a spend;
-//  - spends carry "-", income is bare: only the minuses are spends.
-// Interest and transfers between the person's own accounts are listed but left unticked:
-// interest is already counted in the debt, and a transfer is not money spent.
+//  - spends carry "-", income is bare: only the minuses are spends;
+//  - nothing is signed: the words tell income ("Зачисление", "Пополнение", "Возврат"…) from spends.
+// Interest and transfers between the person's own accounts are listed but left unticked; a purchase the bank
+// cancelled or refunded within a few days is unticked too.
 const BANK_CAT = 'Проценты и комиссии', BANK_FEE = /^(проценты по|плата за|комисси|штраф|пени|неустойк)/i;
-const SKIP_DESC = [[/процент/i, 'проценты, уже в долге'], [/(внутренн\S* перевод|перевод (между|на) (сво|договор|сч[её]т))/i, 'перевод между своими счетами']];
+const INCOME_WORDS = /^(зачислен|пополнен|поступлен|возврат|отмена|кэшб[эе]к|cashback|зарплат|заработн|перевод от|входящий перевод|refund)/i;
+const SKIP_DESC = [[/^проценты|начислен\S* процент/i, 'проценты, уже в долге'], [/(внутренн\S* перевод|перевод (между|на) (сво(й|и|их)|договор)\b)/i, 'перевод между своими счетами']];
+const MAX_IMPORT = 500;
 function finishRows(items) {
   items = items.filter(r => r && r.date && r.amount);
-  const hasPlus = items.some(r => r.plus), hasNeg = items.some(r => r.amount < 0);
-  items = items.filter(r => hasPlus ? !r.plus : hasNeg ? r.amount < 0 : true).map(r => ({ ...r, amount: Math.round(Math.abs(r.amount) * 100) / 100, desc: String(r.desc || '').replace(/\s+/g, ' ').trim().slice(0, 60) }));
-  const seen = new Set(S.spends.map(x => x.date + '|' + Math.round(x.amount)));
-  return items.slice(0, 300).map(r => {
-    const dup = seen.has(r.date + '|' + Math.round(r.amount)), why = (SKIP_DESC.find(([re]) => re.test(r.desc)) || [])[1] || '';
+  const hasPlus = items.some(r => r.plus), hasNeg = items.some(r => r.amount < 0 && !r.income);
+  const isIncome = r => r.income || (hasPlus ? r.plus : hasNeg ? r.amount > 0 : INCOME_WORDS.test(String(r.desc || '').trim()));
+  const clean = d => String(d || '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const refunds = items.filter(r => isIncome(r) && /отмена|возврат|refund/i.test(String(r.desc || ''))).map(r => ({ date: r.date, cents: Math.round(Math.abs(r.amount) * 100) }));
+  let spends = items.filter(r => !isIncome(r)).map(r => ({ ...r, amount: Math.round(Math.abs(r.amount) * 100) / 100, desc: clean(r.desc) }));
+  const total = spends.length;
+  if (spends.length > MAX_IMPORT) spends = spends.sort((a, b) => a.date < b.date ? -1 : 1).slice(-MAX_IMPORT);   // the newest are kept
+  // Already recorded: each existing spend matches at most one row, to the kopeck.
+  const have = new Map(); for (const x of S.spends) { const k = x.date + '|' + Math.round((+x.amount || 0) * 100); have.set(k, (have.get(k) || 0) + 1); }
+  const near = (a, b) => Math.abs((parse(a) - parse(b)) / 864e5) <= 3;
+  const out = spends.map(r => {
+    const k = r.date + '|' + Math.round(r.amount * 100), dup = (have.get(k) || 0) > 0; if (dup) have.set(k, have.get(k) - 1);
+    let why = (SKIP_DESC.find(([re]) => re.test(r.desc)) || [])[1] || '';
+    const ri = refunds.findIndex(f => f.cents === Math.round(r.amount * 100) && near(f.date, r.date)); if (!why && ri >= 0) { refunds.splice(ri, 1); why = 'отменено банком'; }
     const bank = BANK_FEE.test(r.desc);
     return { ...r, id: uid(), on: !dup && !why, dup, why, bank, cat: bank ? BANK_CAT : 'Другое' };
   });
+  out.total = total; return out;
 }
 function parseOfx(text) {
-  const out = [];
+  const out = [], ent = v => v.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
   for (const m of text.matchAll(/<STMTTRN>([\s\S]*?)(?=<\/STMTTRN>|<STMTTRN>|<\/BANKTRANLIST>)/gi)) {
-    const g = k => ((m[1].match(new RegExp('<' + k + '>([^<\\r\\n]*)', 'i')) || [])[1] || '').trim();
+    const g = k => ent(((m[1].match(new RegExp('<' + k + '>([^<\\r\\n]*)', 'i')) || [])[1] || '').trim());
     const d = g('DTPOSTED');
-    out.push({ date: /^\d{8}/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : null, amount: parseNum(g('TRNAMT')), desc: g('NAME') || g('MEMO') });
+    out.push({ date: /^\d{8}/.test(d) ? parseDateStr(`${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`) : null, amount: parseNum(g('TRNAMT')), desc: g('NAME') || g('MEMO') });
   }
   return finishRows(out);
 }
 function parseQif(text) {
-  const out = []; let cur = {};
+  const recs = []; let cur = {};
   for (const raw of text.split(/\r?\n/)) {
     const k = raw[0], v = raw.slice(1).trim();
-    if (k === 'D') cur.date = parseDateStr(v.replace(/'/g, '.').replace(/\//g, '.'));
+    if (k === 'D') cur.d = v.replace(/'/g, '/').replace(/\s/g, '');
     else if (k === 'T' || k === 'U') cur.amount = parseNum(v);
     else if (k === 'P' || (k === 'M' && !cur.desc)) cur.desc = v;
-    else if (k === '^') { out.push(cur); cur = {}; }
+    else if (k === '^') { recs.push(cur); cur = {}; }
   }
-  return finishRows(out);
+  if (cur.d) recs.push(cur);   // the last record may have no closing "^"
+  const order = slashOrder(recs.map(r => r.d), 'mdy');   // QIF is month/day unless the file shows otherwise
+  return finishRows(recs.map(r => ({ date: parseDateStr(String(r.d || '').replace(/\./g, '/'), order) || parseDateStr(r.d), amount: r.amount, desc: r.desc })));
 }
 // Turns text lines of a statement (from a PDF) into operations. An operation row starts with its date
-// (optionally after a row number); summary lines such as "Баланс на 12.11.26 −219 499,52" have the date
-// in the middle and are skipped. A sign counts only when it stands apart: in "SANKT- 478.00" the dash
-// belongs to the shop name, not to the amount. A line without a date continues the previous description.
+// (optionally after a row number). Summary lines ("Баланс на 12.11.26 −219 499,52", "Итого…") are skipped.
+// A sign counts only when it stands apart: in "SANKT- 478.00" the dash belongs to the shop name.
+// Amounts in another currency ("10.00 $") give way to the rouble amount on the same line, and counts such as
+// "40,00 л" are not money. A line without a date, or Sber's second line of the same operation (same date,
+// a 6-digit authorisation code, no time), continues the previous description.
 function linesToRows(lines) {
-  const AMT = /(?:(?<![\p{L}\p{N}])[+\-−–]\s?)?(?<![\p{N}.,])\d{1,3}(?:[ \u00a0\u202f]\d{3})*[.,]\d{2}(?![\p{N}])/gu;
-  const SUMMARY = /баланс|остаток|итого|задолженност|кредитный лимит|минимальный платеж|минимальный платёж|оплатить до|расходы:|поступления:/i;
+  const AMT = /(?:(?<![\p{L}\p{N}])[+\-−–]\s?)?(?<![\p{N}.,])\d{1,3}(?:[   ]\d{3})*[.,]\d{2}(?![\p{N}])/gu;
+  const FOREIGN = /^\s*(\$|€|£|¥|USD|EUR|GBP|CNY|KZT|BYN|TRY|AED|USDT)(?![A-Za-z])/, UNIT = /^\s*(л|шт|кг|г|%|мл)(?![\p{L}])/u;
+  const SUMMARY = /^(баланс|остаток|итого|задолженност|кредитный лимит|минимальн\S* плат[её]ж|оплатить до|расходы|поступления|сумма (списаний|пополнений|поступлений))/i;
+  const FOOTER = /страница \d|лицензи|^(ао|пао|ооо)\s|www\.|^\d+ из \d+$/i;
   const out = []; let last = null;
   for (const l of lines) {
-    const t = l.trim(), dm = t.match(/^(?:\d{1,4}\s+)?(\d{2})[./](\d{2})[./](\d{4}|\d{2})(?!\d)/);
-    if (!dm) { if (last && !AMT.test(t) && t.length < 60) last.desc += ' ' + t; AMT.lastIndex = 0; continue; }
+    const t = String(l).slice(0, 400).trim(), dm = t.match(/^(?:\d{1,4}\s+)?(\d{1,2})[./](\d{1,2})[./](\d{4}|\d{2})(?!\d)/);
+    AMT.lastIndex = 0;
+    if (!dm) { if (last && !AMT.test(t) && t.length < 60 && !FOOTER.test(t)) last.desc += ' ' + t; AMT.lastIndex = 0; continue; }
+    const date = parseDateStr(dm[0].replace(/^\d{1,4}\s+(?=\d{1,2}[./])/, '')); if (!date) { last = null; continue; }
+    const hasTime = /\b\d{1,2}:\d{2}(:\d{2})?\b/.test(t);
+    const rest = t.replace(/\b\d{1,2}[./]\d{1,2}[./](\d{4}|\d{2})\b/g, ' ').replace(/\b\d{1,2}:\d{2}(:\d{2})?\b/g, ' ').trim();
+    if (last && date === last.date && !hasTime && /^\d{6}\b/.test(rest)) {   // Sber: the second line of the same operation
+      last.desc += ' ' + rest.replace(/^\d{6}\s*/, '').replace(AMT, ' ').replace(/[$€£¥]|\b(USD|EUR|GBP)\b/g, ' ').replace(/\s+/g, ' ').trim(); AMT.lastIndex = 0; continue;
+    }
     last = null;
-    const date = parseDateStr(dm[0].replace(/^\d{1,4}\s+(?=\d{2}[./])/, '')); if (!date || SUMMARY.test(t)) continue;
-    const rest = t.replace(/\b\d{2}[./]\d{2}[./](\d{4}|\d{2})\b/g, ' ').replace(/\b\d{1,2}:\d{2}(:\d{2})?\b/g, ' ');
-    const am = rest.match(AMT); if (!am) continue;
-    const raw = am[0];                                      // the first amount is the operation; later ones are usually the balance
-    out.push(last = { date, amount: parseNum(raw), plus: /^\s*\+/.test(raw), desc: rest.replace(AMT, ' ').replace(/[₽]|\bRUB\b|(?<![А-Яа-яЁё])руб\.?(?![А-Яа-яЁё])/gi, ' ').replace(/\s+/g, ' ').trim() });
+    if (SUMMARY.test(rest)) continue;
+    const ms = [...rest.matchAll(AMT)].map(m => ({ raw: m[0], i: m.index, after: rest.slice(m.index + m[0].length, m.index + m[0].length + 8) }))
+      .filter(m => !UNIT.test(m.after));
+    if (!ms.length) continue;
+    let pick = ms.find(m => !FOREIGN.test(m.after)) || ms[0];
+    // "KAFE 24 450.00 ₽ 450.00 ₽": a short number before the amount glued onto it; the repeated column shows the real one.
+    const k = ms.indexOf(pick), next = ms[k + 1], digits = x => x.replace(/[^\d]/g, '');
+    if (next && digits(pick.raw) !== digits(next.raw) && digits(pick.raw).endsWith(digits(next.raw)) && !FOREIGN.test(next.after)) pick = next;
+    const raw = pick.raw;
+    const desc = rest.replace(AMT, ' ').replace(/[₽$€]|\b(RUB|RUR|USD|EUR)\b|(?<![А-Яа-яЁё])руб\.?(?![А-Яа-яЁё])/gi, ' ').replace(/\s+/g, ' ').trim();
+    out.push(last = { date, amount: parseNum(raw), plus: /^\s*\+/.test(raw), desc });
   }
   return finishRows(out);
 }
@@ -1732,27 +1859,37 @@ async function pdfLines(buf) {
 }
 async function xlsxText(buf) {
   await loadLib('xlsx');
-  const wb = window.XLSX.read(buf, { type: 'array', cellDates: false, dense: true });
-  return wb.SheetNames.slice(0, 3).map(n => window.XLSX.utils.sheet_to_csv(wb.Sheets[n], { FS: ';', blankrows: false, dateNF: 'dd.mm.yyyy' })).join('\n');
+  const wb = window.XLSX.read(buf, { type: 'array', cellDates: true, dense: true });
+  // A date cell becomes dd.mm.yyyy; noon shifts keep the day right whatever time zone the file was made in.
+  const cell = v => v instanceof Date ? (isNaN(v) ? '' : (d => `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`)(new Date(v.getTime() + 432e5)))
+    : typeof v === 'number' ? String(v) : String(v ?? '');
+  const q = x => /[;"\n\r]/.test(x) ? '"' + x.replace(/"/g, '""').replace(/[\r\n]+/g, ' ') + '"' : x;
+  return wb.SheetNames.slice(0, 3).map(n => window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, blankrows: false, defval: '' })
+    .map(r => r.map(c => q(cell(c))).join(';')).join('\n')).join('\n');
 }
 function decodeText(buf) {
+  if (buf[0] === 0xFF && buf[1] === 0xFE) return new TextDecoder('utf-16le').decode(buf);
+  if (buf[0] === 0xFE && buf[1] === 0xFF) return new TextDecoder('utf-16be').decode(buf);
   try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { return new TextDecoder('windows-1251').decode(buf); }
 }
 // Reads the summary of a credit card statement: debt on the latest date, limit, minimum payment,
 // its due date and the interest charged. Amounts must carry ₽/RUB or a sign, so bonus-point balances are ignored.
 function cardMeta(lines) {
-  const txt = lines.join('\n'), A = '([+\\-−–]?\\s?\\d{1,3}(?:[ \\u00a0\\u202f]\\d{3})*[.,]\\d{2})';
+  const txt = lines.slice(0, 4000).map(l => String(l).slice(0, 300)).join('\n');
+  if (!/кредитн(ая|ой|ую|ый) (карт|лимит)|кредитный лимит/i.test(txt)) return null;
+  const A = '([+\\-−–]?[ \\t]?\\d{1,3}(?:[ \\u00a0\\u202f]\\d{3})*(?:[.,]\\d{2})?)', CUR = '[ \\t]*(?:₽|RUB|руб|р\\.)';
   const one = re => { const m = txt.match(re); return m ? Math.abs(parseNum(m[1])) : null; };
-  const bal = [...txt.matchAll(new RegExp('(?:баланс|задолженность|долг)\\s+на\\s+(\\d{2}[./]\\d{2}[./]\\d{2,4})\\s*[:=]?\\s*' + A + '(\\s*(?:₽|RUB|руб))?', 'gi'))]
-    .map(m => ({ date: parseDateStr(m[1]), v: parseNum(m[2]), money: !!m[3] || /^[\-−–]/.test(m[2].trim()) })).filter(x => x.date && x.v !== null && x.money)
-    .sort((a, b) => a.date < b.date ? -1 : 1);
-  const limit = one(new RegExp('кредитный лимит\\D{0,12}?' + A, 'i')), min = one(new RegExp('минимальн\\S*\\s+платеж\\D{0,12}?' + A, 'i'));
-  const pb = txt.match(/оплатить до\s+(\d{2}[./]\d{2}[./]\d{2,4})/i), payBy = pb ? parseDateStr(pb[1]) : '';
-  const interest = one(new RegExp('(?:^|\\n)\\s*•?\\s*проценты\\s*' + A, 'i'));
-  if (!(limit || (bal.length && /кредит/i.test(txt)))) return null;
-  const last = bal[bal.length - 1], first = bal[0];
-  const apr = interest && first && Math.abs(first.v) > 0 ? Math.round(interest / Math.abs(first.v) * 1200 * 10) / 10 : 0;
-  return { debt: last ? Math.abs(last.v) : null, debtDate: last ? last.date : '', limit, min, payBy, interest, apr: apr > 0 && apr < 200 ? apr : 0 };
+  const bal = [...txt.matchAll(new RegExp('(баланс|задолженность|долг)[ \\t]+на[ \\t]+(\\d{2}[./]\\d{2}[./]\\d{2,4})[ \\t]*[:=]?[ \\t]{0,3}' + A + '(' + CUR + ')?', 'gi'))]
+    .map(m => ({ word: m[1].toLowerCase(), date: parseDateStr(m[2]), v: parseNum(m[3]), signed: /^[+\-−–]/.test(m[3].trim()), money: !!m[4] }))
+    .filter(x => x.date && x.v !== null && (x.money || x.signed)).sort((a, b) => a.date < b.date ? -1 : 1);
+  const limit = one(new RegExp('(?<!доступн\\S*[ \\t])кредитный лимит[^\\n]{0,40}?' + A + CUR, 'i'));
+  const min = one(new RegExp('минимальн\\S*[ \\t]+плат[её]ж[^\\n]{0,40}?' + A + CUR, 'i'));
+  const pb = txt.match(/(?:оплатить|внести|погасить|плат[её]ж)[ \t]+до[ \t]+(\d{2}[./]\d{2}[./]\d{2,4})/i), payBy = pb ? parseDateStr(pb[1]) : '';
+  const interest = one(new RegExp('^[ \\t]*•?[ \\t]*проценты[ \\t]*[:=]?[ \\t]*' + A, 'im'));
+  const debtOf = x => !x ? null : x.word === 'баланс' ? (x.v < 0 ? Math.abs(x.v) : 0) : Math.abs(x.v);
+  const last = bal[bal.length - 1], first = bal[0], firstDebt = debtOf(first);
+  const apr = interest && firstDebt > 0 ? Math.round(interest / firstDebt * 1200 * 10) / 10 : 0;
+  return { debt: debtOf(last), debtDate: last ? last.date : '', limit, min, payBy, interest, apr: apr > 0 && apr < 200 ? apr : 0 };
 }
 let csvMeta = null;
 async function readStatement(file) {
@@ -1768,17 +1905,17 @@ async function readStatement(file) {
 
 function cardMetaHtml() {
   const m = csvMeta; if (!m || m.debt === null) return '';
-  const cards = S.debts.filter(d => d.kind === 'card'), pick = cards[0] || S.debts[0];
+  const cards = S.debts.filter(d => d.kind === 'card'), pick = cards[0] || null;
   const facts = [`долг на ${fmtD(parse(m.debtDate))}: ${rub(m.debt)}`, m.limit ? `лимит ${rub(m.limit)}` : '', m.min ? `мин. платёж ${rub(m.min)}${m.payBy ? ' до ' + fmtD(parse(m.payBy)) : ''}` : '',
     m.interest ? `проценты за период ${rub(m.interest)}${m.apr ? `, это около ${String(m.apr).replace('.', ',')}% годовых` : ''}` : ''].filter(Boolean);
   return `<div class="banner">${ic('wallet')}<div><b>Это выписка по кредитной карте</b><p class="note">${facts.join(' · ')}.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center"><select id="metaDebt" aria-label="Какой долг обновить">${S.debts.map(d => `<option value="${d.id}" ${pick && d.id === pick.id ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}<option value="">Новый долг</option></select>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center"><select id="metaDebt" aria-label="Какой долг обновить">${S.debts.map(d => `<option value="${d.id}" ${pick && d.id === pick.id ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}<option value="" ${pick ? '' : 'selected'}>Новый долг</option></select>
     <button class="primary" data-meta-apply="1">${ic('check')}Обновить долг по выписке</button></div>
     <p class="note" style="margin-top:6px">Задолженность, лимит, мин. платёж и дата платежа станут как в выписке${m.apr ? ', ставка — по начисленным процентам' : ''}.</p></div></div>`;
 }
 function csvPreview() {
   const on = csvRows.filter(r => r.on);
-  return cardMetaHtml() + `<div class="kv"><span>Найдено ${csvRows.length}, выбрано ${on.length} на ${rub(on.reduce((a, r) => a + r.amount, 0))}</span><button class="linkbtn" data-csv-cancel="1">Отмена</button></div>
+  return cardMetaHtml() + `${csvRows.total > csvRows.length ? `<p class="note">В выписке ${csvRows.total} списаний, показаны последние ${csvRows.length}. Остальные загрузи отдельной выпиской за более ранний период.</p>` : ''}<div class="kv"><span>Найдено ${csvRows.length}, выбрано ${on.length} на ${rub(on.reduce((a, r) => a + r.amount, 0))}</span><button class="linkbtn" data-csv-cancel="1">Отмена</button></div>
     <div class="csvbox">${csvRows.map(r => `<div class="csvrow">
       <input type="checkbox" data-csv-on="${r.id}" ${r.on ? 'checked' : ''} aria-label="Импортировать">
       <span class="num">${fmtD(parse(r.date))}</span>
@@ -1898,13 +2035,16 @@ function setSync(cls, text) { syncState = [cls, text]; const el = $('syncLine');
 // Milestones (25/50/75/100%) are remembered in S.cele so each one is celebrated once.
 function celeLevels() {
   const lv = p => [100, 75, 50, 25].find(m => p >= m - 1e-9) || 0;
-  const o = { debt: S.debts.length ? lv(progress().pctAll) : 0, goals: {} };
+  const o = { debt: S.debts.length && +S.debtStart > 0 ? lv(progress().pctAll) : 0, goals: {} };
   for (const g of S.goals) o.goals[g.id] = +g.target > 0 ? lv(goalProgress(g).pct) : 0;
   return o;
 }
 function checkCele() {
   if (!S.onboarded || onb) return;
-  const now = celeLevels(), was = S.cele; S.cele = now; if (!was) return;
+  const now = celeLevels(), was = S.cele;
+  // Keep the highest level reached: a card debt goes up and down every day, and a milestone is celebrated once.
+  S.cele = { debt: Math.max(now.debt, (was && was.debt) || 0), goals: Object.fromEntries(S.goals.map(g => [g.id, Math.max(now.goals[g.id] || 0, ((was && was.goals) || {})[g.id] || 0)])) };
+  if (!was) return;
   let show = null;
   for (const g of S.goals) { const m = now.goals[g.id]; if (m > ((was.goals || {})[g.id] || 0)) { const p = goalProgress(g);
     show = m === 100 ? { m, icon: 'trophy', label: 'Цель достигнута', title: g.name, text: `Накоплено ${rub(p.saved)}. Все 100 клеток закрашены.` }
@@ -1922,60 +2062,88 @@ function showCele(c) {
   $('cele').hidden = false; $('celeOk').focus();
 }
 function commit(msg) {
+  rev++;
   syncCard();
   if (S.onboarded && !onb) { const k = ymd(today0()); if (S.limits[k] !== undefined) S.limits[k] = Math.round(Math.max(0, calc().perDayToday)); }
   checkCele();
   render(); if (msg) toast(msg);
   lastJson = canon(S);
   lsSave(lastJson);
+  if ((TG || dbRef) && !lsGet(PKEY)) lsPut(PKEY, String(Date.now()));
+  if (TG || dbRef) dirty = true;
   if (!dbRef && !tgCloud) return;
-  dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(flush, tgCloud ? 1500 : 600);
+  clearTimeout(saveTimer); saveTimer = setTimeout(flush, tgCloud ? 800 : 600);
 }
 // Telegram CloudStorage keeps small string values per user and bot, so the state is stored in
 // numbered pieces; only pieces that changed are written. "meta" holds the count and a checksum.
-const TG = (() => { try { const w = window.Telegram && window.Telegram.WebApp; return w && w.initData ? w : null; } catch (e) { return null; } })();
+// telegram-web-app.js also builds a session from "#tgWebAppData=…" in any browser, so a crafted link could pose
+// as Telegram. A real client always provides a bridge (webview proxy, external.notify or a parent frame),
+// a signed hash and a known platform.
+const TG = (() => { try {
+  const w = window.Telegram && window.Telegram.WebApp;
+  const bridge = window.TelegramWebviewProxy !== undefined || (window.external && 'notify' in window.external) || window.parent !== window;
+  return w && w.initData && bridge && w.initDataUnsafe && w.initDataUnsafe.hash && w.platform && w.platform !== 'unknown' ? w : null;
+} catch (e) { return null; } })();
 // The device copy belongs to one Telegram account: several accounts on one phone share this
 // storage, so the key carries the account id and the old shared key is never read inside Telegram.
 const TGID = (() => { try { const id = String(TG && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.id || ''); return /^\d{1,20}$/.test(id) ? id : ''; } catch (e) { return ''; } })();
 const LSKEY = TG ? (TGID ? 'dolg-state:tg:' + TGID : '') : 'dolg-state';
-if (TG) try { localStorage.removeItem('dolg-state'); } catch (e) {}
 function lsSave(json) { if (LSKEY) try { localStorage.setItem(LSKEY, json); } catch (e) {} }
+// Next to the device copy: "pending" = changes made here that have not reached the cloud yet (time of the
+// first one), "base" = checksum of the cloud copy this device last read or wrote. They decide, on the next
+// start, whether the device copy or the cloud copy is the newer one, so nothing typed here is lost.
+const lsGet = k => { try { return k ? localStorage.getItem(k) : null; } catch (e) { return null; } };
+const lsPut = (k, v) => { if (k) try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
+const PKEY = LSKEY ? LSKEY + ':pending' : '', BKEY = LSKEY ? LSKEY + ':base' : '';
 let tgCloud = false, tgParts = [];
 const tgCall = (m, ...a) => new Promise((res, rej) => { try { TG.CloudStorage[m](...a, (err, v) => err ? rej(new Error(String(err))) : res(v)); } catch (e) { rej(e); } });
 const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 const toAscii = json => json.replace(/[\u0080-\uffff]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 async function tgSave() {
-  const json = toAscii(canon(S)), parts = json.match(/[\s\S]{1,3600}/g) || [''];
+  const json = toAscii(canon(S)), parts = json.match(/[\s\S]{1,3600}/g) || [''], h = hash(json), was = tgParts.length;
   if (parts.length > 900) throw new Error('too big');
-  for (let i = 0; i < parts.length; i++) if (parts[i] !== tgParts[i]) await tgCall('setItem', 'p' + i, parts[i]);
-  await tgCall('setItem', 'meta', JSON.stringify({ n: parts.length, h: hash(json), t: Date.now() }));
-  tgParts = parts;
+  try {
+    for (let i = 0; i < parts.length; i++) if (parts[i] !== tgParts[i]) { await tgCall('setItem', 'p' + i, parts[i]); tgParts[i] = parts[i]; }
+    await tgCall('setItem', 'meta', JSON.stringify({ n: parts.length, h, t: Date.now() }));
+  } catch (e) { tgParts = []; throw e; }   // unsure what is in the cloud now: the next save rewrites every part
+  tgParts = parts; lsPut(BKEY, h);
+  if (was > parts.length) { const old = []; for (let i = parts.length; i < was; i++) old.push('p' + i); tgCall('removeItems', old).catch(() => {}); }
 }
-async function tgLoad() {
+// Reads the cloud copy without touching any state; the caller decides what to do with it.
+async function tgRead() {
   const meta = JSON.parse((await tgCall('getItem', 'meta')) || 'null');
-  if (!meta || !(meta.n > 0) || meta.n > 900) return null;
+  if (!meta || !(meta.n > 0) || meta.n > 900) return { raw: null, parts: [], h: '' };
   const parts = [];
   for (let i = 0; i < meta.n; i += 50) {
     const keys = [...Array(Math.min(50, meta.n - i))].map((_, k) => 'p' + (i + k)), got = await tgCall('getItems', keys);
     for (const k of keys) parts.push(String((got || {})[k] ?? ''));
   }
   const json = parts.join('');
-  if (hash(json) !== meta.h) throw new Error('checksum');   // a save was interrupted: do not trust the cloud copy
-  tgParts = parts;
-  return JSON.parse(json);
+  if (hash(json) !== meta.h) { const e = new Error('checksum'); e.h = meta.h; throw e; }   // a save was interrupted: do not trust the cloud copy
+  return { raw: JSON.parse(json), parts, h: meta.h };
 }
+let retryMs = 0;
 async function flush() {
-  if (saving || !dirty || (!dbRef && !tgCloud)) return;
+  if (saving || !dirty || (!dbRef && !tgCloud) || (dbRef && !cloudReady)) return;
   saving = true; dirty = false; setSync('', 'Сохраняю…');
-  if (!dbRef) {
-    try { await tgSave(); setSync('ok', 'Всё сохранено'); }
-    catch (e) { setSync('err', 'Не сохранилось в облако, данные остались на этом устройстве'); }
-    saving = false; if (dirty) { clearTimeout(saveTimer); saveTimer = setTimeout(flush, 1500); } return;
+  let ok = false;
+  try {
+    if (dbRef) { await dbRef.set(clone(S)); lsPut(BKEY, hash(canon(S))); } else await tgSave();
+    ok = true; retryMs = 0; setSync('ok', 'Всё сохранено');
+    if (!dirty) lsPut(PKEY, null);
+  } catch (e) {
+    if (dbRef && e?.code === 'invalid_argument') { dbRef = null; setSync('err', 'Нет прав на запись, сохраняю на этом устройстве'); }
+    else {
+      dirty = true; retryMs = Math.min(60000, retryMs ? retryMs * 2 : 3000);
+      setSync('err', e && e.message === 'too big' ? 'Данных слишком много для облака Telegram, они сохранены на этом устройстве' : `Не сохранилось в облако, повторю через ${Math.round(retryMs / 1000)} с. Данные на этом устройстве`);
+    }
   }
-  try { await dbRef.set(clone(S)); setSync('ok', 'Всё сохранено'); }
-  catch (e) { setSync('err', e?.code === 'invalid_argument' ? 'Нет прав на запись, сохраняю на этом устройстве' : 'Не сохранилось, данные остались на этом устройстве'); if (e?.code === 'invalid_argument') dbRef = null; }
-  saving = false; if (dirty) flush();
+  saving = false;
+  if (dirty && (dbRef || tgCloud)) { clearTimeout(saveTimer); saveTimer = setTimeout(flush, ok ? 800 : retryMs); }
 }
+// Leaving the app (switching away, closing the mini app) saves at once instead of waiting.
+const flushNow = () => { if (dirty && !saving) { clearTimeout(saveTimer); flush(); } };
+try { window.addEventListener('pagehide', flushNow); } catch (e) {}
 // Remember today's limit once a day, so "yesterday" and the streak can be judged later.
 function stampDay() {
   if (!S.onboarded || onb || mode === 'loading') return;
@@ -1986,7 +2154,7 @@ function stampDay() {
 }
 let lastDay = ymd(today0());
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) return;
+  if (document.hidden) { flushNow(); return; }
   const k = ymd(today0()); if (k === lastDay) return;   // re-render only when the date has changed
   lastDay = k; stampDay(); render();
 });
@@ -1994,6 +2162,11 @@ document.addEventListener('visibilitychange', () => {
 { const tick = setInterval(() => { const k = ymd(today0()); if (k !== lastDay && !document.hidden) { lastDay = k; stampDay(); render(); } }, 60000); if (tick && tick.unref) tick.unref(); }
 
 /* ---------- events ---------- */
+// An undone debt payment puts back what it had taken off the debt.
+function returnPrinc(sp) {
+  if (!sp || !sp.ref || sp.ref.t !== 'debt' || !(+sp.ref.princ > 0)) return;
+  const d = S.debts.find(x => x.id === sp.ref.id); if (d) d.balance = r2((+d.balance || 0) + (+sp.ref.princ));
+}
 function unpay(t, id, key) {
   if (t === 'one') { const o = S.oneoffs.find(x => x.id === id); if (o) o.paid = false; return; }
   const it = (t === 'bill' ? S.bills : S.debts).find(x => x.id === id); if (it) it.paid = (it.paid || []).filter(k => k !== key);
@@ -2009,7 +2182,7 @@ function nextDue(day) {
 const dueInput = (attr, id, day, label) => `<input ${attr}="${id}" data-f="day" data-date="1" type="date" value="${nextDue(day)}" aria-label="${label}">`;
 function addSpend(amount, cat, date, note) {
   const sp = { id: uid(), date, amount, cat, ...(note ? { note } : {}) };
-  S.spends.push(sp); if (S.spends.length > 1500) S.spends = S.spends.slice(-1500);
+  S.spends.push(sp); if (S.spends.length > MAX_SPENDS) S.spends = S.spends.slice(-MAX_SPENDS);
   S.balance -= amount;
   commit();
   toast(`Записал ${rub(amount)}, ${cat.toLowerCase()}`, { label: 'Отменить', fn: () => { S.spends = S.spends.filter(x => x.id !== sp.id); S.balance += amount; commit('Отменил'); } });
@@ -2039,15 +2212,13 @@ document.addEventListener('submit', e => {
   }
   if (f.id === 'cardForm') {
     const cd = payCardDebt(), v = $('cardNew').value; editBal = false; if (!cd || v === '') { render(); return; }
-    const nb = Math.max(0, +v || 0); if (nb > (+cd.balance || 0)) S.debtStart = (+S.debtStart || 0) + (nb - (+cd.balance || 0));
-    cd.balance = nb; commit(`Долг по «${cd.name}» сверен: ${rub(nb)}`); return;
+    cd.balance = Math.max(0, +v || 0); commit(`Долг по «${cd.name}» сверен: ${rub(nb)}`); return;
   }
   if (f.id === 'balForm' && payCardDebt()) {
     const cd = payCardDebt(), v = $('balNew').value; editBal = false; if (v === '') { render(); return; }
     S.balance = isFinite(+v) ? +v : 0;
     if (+cd.limit > 0) {   // the bank shows what is available; the debt is the rest of the limit
-      const nd = Math.max(0, r2(cd.limit - S.balance)); if (nd > (+cd.balance || 0)) S.debtStart = (+S.debtStart || 0) + (nd - (+cd.balance || 0));
-      cd.balance = nd;
+      cd.balance = Math.max(0, r2(cd.limit - S.balance));
     }
     cardMark(); commit(+cd.limit > 0 ? `Доступно ${rub(S.balance)}, долг по карте ${rub(cd.balance)}` : 'Сумма на жизнь обновлена'); return;
   }
@@ -2129,10 +2300,10 @@ document.addEventListener('click', e => {
   if (d.rates) { fetchRates(true); return; }
   if (d.wi) { whatIf = whatIf === +d.wi ? 0 : +d.wi; const y = scrollY; renderDebt(); scrollTo(0, y); return; }
   if (d.wiApply) { S.planMonthly = Math.round(monthlySave().save + whatIf); whatIf = 0; commit(`План обновлён: ${rub(S.planMonthly)} в месяц`); return; }
-  if (d.dkind) { const x = S.debts.find(z => z.id === d.id); if (x && x.kind !== d.dkind) { x.kind = d.dkind; if (x.kind !== 'card' && S.payCard === x.id) S.payCard = ''; commit(); } return; }
+  if (d.dkind) { const x = S.debts.find(z => z.id === d.id); if (x && x.kind !== d.dkind) { x.kind = d.dkind; const was = S.payCard === x.id && x.kind !== 'card'; if (was) { S.payCard = ''; cardMark(); } commit(was ? UNLINKED : undefined); } return; }
   if (d.paycard) {
     const on = S.payCard !== d.paycard; S.payCard = on ? d.paycard : ''; const cd = payCardDebt();
-    if (cd && +cd.limit > 0) { const nd = Math.max(0, r2(cd.limit - S.balance)); if (nd > (+cd.balance || 0)) S.debtStart = (+S.debtStart || 0) + (nd - (+cd.balance || 0)); cd.balance = nd; }
+    if (cd && +cd.limit > 0) { S.balance = r2(cd.limit - (+cd.balance || 0)); cardMark(); editBal = 'own'; commit(`Доступно = лимит − долг: ${rub(S.balance)}. Впиши точную сумму из приложения банка`); go('home'); const i = $('balNew'); if (i && i.focus) { i.focus(); i.select(); } return; }
     cardMark();
     commit(!on ? 'Теперь «На карте» — твои деньги на дебетовой карте. Сверь баланс с банком' : cd && +cd.limit > 0 ? `Долг по карте: лимит ${rub(cd.limit)} − доступно ${rub(S.balance)} = ${rub(cd.balance)}` : 'Теперь траты и доходы двигают долг по этой карте'); return;
   }
@@ -2152,7 +2323,7 @@ document.addEventListener('click', e => {
   if (d.delGoal) {
     const g = S.goals.find(x => x.id === d.delGoal); if (!g) return;
     undoable(`Цель «${g.name}» удалена, деньги на карте`, () => {
-      S.balance += Math.max(0, goalSaved(g));
+      S.balance += Math.max(0, (+g.extra || 0) + S.entries.filter(en => en.goalId === g.id).reduce((a, en) => a + toRub(en.saved, en.cur, en.rate), 0));
       for (const en of S.entries) if (en.goalId === g.id) { en.free = (+en.free || 0) + (+en.saved || 0); en.saved = 0; delete en.goalId; }
       S.goals = S.goals.filter(x => x !== g);
     }); return;
@@ -2161,13 +2332,13 @@ document.addEventListener('click', e => {
     const g = { id: uid(), name: onb ? 'Моя цель' : 'Новая цель', target: 0, monthly: 0, extra: 0 };
     (onb || S).goals.push(g); if (onb) render(); else { goalTab = g.id; commit(); } return;
   }
-  if (d.editbal) { editBal = d.editbal === 'card' ? 'card' : 'own'; if (view !== 'home') go('home'); renderHome(); const i = $('balNew'); if (i) { i.focus(); i.select(); } return; }
+  if (d.editbal) { editBal = d.editbal === 'card' ? 'card' : 'own'; if (view !== 'home') go('home'); renderHome(); const i = $('balNew'); if (i && i.focus) { i.focus(); i.select(); } return; }
   if (d.unpay) {
     const t = d.unpay, id = d.id, key = d.key || '';
     const item = (t === 'one' ? S.oneoffs : t === 'bill' ? S.bills : S.debts).find(x => x.id === id); if (!item) return;
     undoable(`${item.name}: снова не оплачено`, () => {
       const sp = [...S.spends].reverse().find(x => x.planned && (x.ref ? (x.ref.t === t && x.ref.id === id && (x.ref.key || '') === key) : x.note === item.name));
-      if (sp) { S.spends = S.spends.filter(x => x !== sp); S.balance += +sp.amount || 0; }   // money comes back only if the payment was recorded here
+      if (sp) { S.spends = S.spends.filter(x => x !== sp); S.balance += +sp.amount || 0; returnPrinc(sp); }   // money comes back only if the payment was recorded here
       unpay(t, id, key);
     }); return;
   }
@@ -2176,8 +2347,12 @@ document.addEventListener('click', e => {
     const amt = +(d.pay ? item.amount : dueAmt(item)) || 0;
     undoable(`${item.name}: оплачено`, () => {
       item.paid = [...(item.paid || []), d.key].slice(-24); S.balance -= amt;
-      S.spends.push({ id: uid(), date: ymd(today0()), amount: amt, cat: 'Обязательные', note: item.name, planned: true, ref: { t: d.pay ? 'bill' : 'debt', id: item.id, key: d.key } });
-      if (d.payDebt && +item.apr > 0 && S.payCard !== item.id) item.balance = Math.max(0, item.balance - Math.max(0, amt - item.balance * item.apr / 1200));
+      let princ = 0;
+      if (d.payDebt && S.payCard !== item.id) {   // the card being paid with is topped up instead; its debt follows the balance
+        const interest = +item.apr > 0 ? (+item.balance || 0) * item.apr / 1200 : item.io ? +item.min || 0 : 0;
+        princ = Math.min(+item.balance || 0, Math.max(0, r2(amt - interest))); item.balance = r2((+item.balance || 0) - princ);
+      }
+      S.spends.push({ id: uid(), date: ymd(today0()), amount: amt, cat: 'Обязательные', note: item.name, planned: true, ref: { t: d.pay ? 'bill' : 'debt', id: item.id, key: d.key, ...(princ > 0 ? { princ } : {}) } });
     }); return;
   }
   if (d.payOne) {
@@ -2186,7 +2361,7 @@ document.addEventListener('click', e => {
       S.spends.push({ id: uid(), date: ymd(today0()), amount: +o.amount || 0, cat: 'Разовая', note: o.name, planned: true, ref: { t: 'one', id: o.id, key: '' } }); }); return;
   }
   if (d.delSpend) { const s = S.spends.find(x => x.id === d.delSpend); if (s) undoable(s.planned ? 'Оплата отменена, платёж снова в плане' : 'Трата удалена', () => {
-    S.balance += +s.amount || 0; S.spends = S.spends.filter(x => x !== s);
+    S.balance += +s.amount || 0; S.spends = S.spends.filter(x => x !== s); returnPrinc(s);
     // Deleting a recorded payment puts it back into the upcoming list.
     if (s.ref) unpay(s.ref.t, s.ref.id, s.ref.key);
     else if (s.planned && s.note) {   // payments recorded before links existed: match by name
@@ -2194,12 +2369,18 @@ document.addEventListener('click', e => {
       if (s.cat === 'Разовая' && o) o.paid = false; else if (it) it.paid = it.paid.slice(0, -1); else if (o) o.paid = false;
     }
   }); return; }
-  if (d.delEntry) { const en = S.entries.find(x => x.id === d.delEntry); if (en) undoable('Запись удалена', () => { S.balance -= toRub(en.free, en.cur, en.rate); S.entries = S.entries.filter(x => x !== en); }); return; }
+  if (d.delEntry) { const en = S.entries.find(x => x.id === d.delEntry); if (en) undoable('Запись удалена', () => {
+    S.balance -= toRub(en.free, en.cur, en.rate); S.entries = S.entries.filter(x => x !== en);
+    const pin = potInfo().potIn; if ((+S.potUsed || 0) > pin) S.potUsed = Math.max(0, pin);
+  }); return; }
   const T = onb || S;
   if (d.delBill) { if (onb) { onb.bills = onb.bills.filter(x => x.id !== d.delBill); render(); } else undoable('Платёж удалён', () => S.bills = S.bills.filter(x => x.id !== d.delBill)); return; }
   if (d.delDebt) {
     if (onb) { onb.debts = onb.debts.filter(x => x.id !== d.delDebt); render(); return; }
-    const x = S.debts.find(z => z.id === d.delDebt); if (x) undoable('Долг удалён', () => { S.debtStart = Math.max(0, S.debtStart - (+x.balance || 0)); S.debts = S.debts.filter(z => z !== x); }); return;
+    const x = S.debts.find(z => z.id === d.delDebt); if (x) undoable(S.payCard === x.id ? 'Долг удалён. ' + UNLINKED : 'Долг удалён', () => {
+      S.debts = S.debts.filter(z => z !== x); if (S.payCard === x.id) { S.payCard = ''; cardMark(); }
+      S.debtStart = Math.max(totalDebt(), (+S.debtStart || 0) - (+x.balance || 0));   // never below what is still owed
+    }); return;
   }
   if (d.delHabit) { undoable('Удалено', () => S.habits = S.habits.filter(x => x.id !== d.delHabit)); return; }
   if (d.delOne) { undoable('Удалено', () => S.oneoffs = S.oneoffs.filter(x => x.id !== d.delOne)); return; }
@@ -2214,8 +2395,7 @@ document.addEventListener('click', e => {
   if (d.csvCancel) { csvRows = null; csvMeta = null; renderProfile(); return; }
   if (d.metaApply && csvMeta) {
     const m = csvMeta, id = ($('metaDebt') || {}).value; let x = S.debts.find(z => z.id === id);
-    if (!x) { x = { id: uid(), name: 'Кредитная карта', balance: 0, apr: 0, min: 0, day: 0, paid: [], io: false, kind: 'card', limit: 0, graceDate: '', graceLeft: 0 }; S.debts.push(x); }
-    if (m.debt > (+x.balance || 0)) S.debtStart = (+S.debtStart || 0) + (m.debt - (+x.balance || 0));
+    if (!x) { x = { id: uid(), name: 'Кредитная карта', balance: 0, apr: 0, min: 0, day: 0, paid: [], io: false, kind: 'card', limit: 0, graceDate: '', graceLeft: 0 }; S.debts.push(x); S.debtStart = (+S.debtStart || 0) + m.debt; }
     x.kind = 'card'; x.balance = m.debt; if (m.limit) x.limit = m.limit; if (m.min) x.min = m.min;
     if (m.payBy) x.day = parse(m.payBy).getDate(); if (m.apr) { x.apr = m.apr; x.io = false; }
     let msg = `«${x.name}» обновлён по выписке: долг ${rub(x.balance)}`;
@@ -2251,14 +2431,17 @@ document.addEventListener('click', e => {
     onb.goals = onb.goals.filter(g => +g.target > 0 || (onb.scen.save && String(g.name).trim() && g.name !== 'Моя цель'));
     onb.debts.forEach((d, i) => { if (!String(d.name).trim()) d.name = onb.debts.length > 1 ? `Долг ${i + 1}` : 'Долг'; });
     onb.goals.forEach((g, i) => { if (!String(g.name).trim() || g.name === 'Моя цель') g.name = onb.goals.length > 1 ? `Цель ${i + 1}` : 'Цель'; });
-    const wasStart = +S.debtStart || 0;
+    const wasStart = +S.debtStart || 0, wasTotal = totalDebt();
     delete onb.payWith; delete onb.cardLimit;
     S = migrate(Object.assign(onb, { onboarded: true })); cardMark();   // a new starting balance is not a spend
-    const tot = totalDebt(); if (!wasStart || tot > wasStart) S.debtStart = tot + (+S.potUsed || 0);
+    const tot = totalDebt(); S.debtStart = wasStart ? wasStart + Math.max(0, tot - wasTotal) : tot + (+S.potUsed || 0);
     onb = null; shownCells = null; stampDay();
     commit('Готово, лимит посчитан'); go('home'); return;
   }
   if (b.id === 'exportBtn') { exportData(); return; }
+  if (b.dataset.cloudRestore) { cloudTorn = false; tgCloud = true; mode = 'tg'; tgParts = []; dirty = true; flush(); renderProfile(); toast('Записываю в облако данные с этого телефона'); return; }
+  if (b.dataset.exportHide) { exportText = ''; renderProfile(); return; }
+  if (b.id === 'restoreBtn') { const v = ($('restoreText') || {}).value || ''; if (v.trim()) restoreFrom(v); return; }
   if (b.id === 'wipe') {
     if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = 'Точно удалить? Нажми ещё раз'; clearTimeout(wipeT); wipeT = setTimeout(() => { b.classList.remove('armed'); b.textContent = 'Удалить всё'; }, 4000); return; }
     S = clone(DEFAULT); commit(); startOnb(); return;
@@ -2296,8 +2479,14 @@ document.addEventListener('change', e => {
     const x = T.debts.find(b => b.id === t.dataset.debt);
     if (x) {
       const f = t.dataset.f, v = f === 'day' ? Math.min(31, Math.max(1, Math.round(val) || 1)) : val;
-      if (!onb && f === 'balance' && v > (+x.balance || 0)) S.debtStart = (+S.debtStart || 0) + (v - (+x.balance || 0));
-      x[f] = v; if (!onb) commit();
+      // A debt typed into an empty card is new borrowing and moves the starting point; corrections do not.
+      if (!onb && f === 'balance' && !(+x.balance > 0) && v > 0) S.debtStart = (+S.debtStart || 0) + v;
+      x[f] = v;
+      if (!onb && f === 'limit' && S.payCard === x.id) {
+        if (+x.limit > 0) { S.balance = r2(x.limit - (+x.balance || 0)); cardMark(); commit(`Доступно на карте: ${rub(S.balance)}. Сверь с банком`); return; }
+        cardMark();
+      }
+      if (!onb) commit();
     }
   }
   if (t.dataset.goal) { const x = T.goals.find(b => b.id === t.dataset.goal); if (x) { x[t.dataset.f] = t.dataset.f === 'name' ? (String(val).trim() || 'Цель') : val; if (!onb) commit(); } }
@@ -2327,14 +2516,11 @@ document.addEventListener('change', e => {
     }).catch(err => toast(err && err.message === 'lib' ? 'Не удалось загрузить модуль для этого формата. Попробуй CSV' : 'Не получилось прочитать файл. Попробуй другой формат выгрузки'));
   }
   if (t.id === 'importFile' && t.files?.[0]) {
-    if (t.files[0].size > 2e6) { toast('Файл слишком большой для копии этого приложения'); return; }
+    const file = t.files[0]; t.value = '';   // the same file can be picked again
+    if (file.size > 2e6) { toast('Файл слишком большой для копии этого приложения'); return; }
     const r = new FileReader();
-    r.onload = () => {
-      try { const data = JSON.parse(r.result); if (!data || typeof data !== 'object' || !Array.isArray(data.bills)) throw 0;
-        S = migrate(Object.assign(data, { onboarded: true })); shownCells = null; commit('Данные загружены из файла');
-      } catch (err) { toast('Это не похоже на копию из этого приложения'); }
-    };
-    r.readAsText(t.files[0]);
+    r.onload = () => restoreFrom(String(r.result || ''));
+    r.readAsText(file);
   }
 });
 
@@ -2357,16 +2543,28 @@ async function fetchRates(manual) {
     if (manual) toast('Не получилось загрузить курсы. Впиши курс вручную');
   }
 }
-setTimeout(() => { if (S.onboarded && !onb && S.ratesAt !== ymd(today0()) && S.entries.some(e => e.cur !== 'RUB')) fetchRates(false); }, 4000);
+setTimeout(function ratesLater() { if (!booted) { setTimeout(ratesLater, 2000); return; } if (S.onboarded && !onb && S.ratesAt !== ymd(today0()) && S.entries.some(e => e.cur !== 'RUB')) fetchRates(false); }, 4000);
 let downloads = null;
+let exportText = '';
 async function exportData() {
   const json = JSON.stringify(S, null, 2), name = `do-zarplaty-${ymd(today0())}.json`;
   if (downloads) { try { await downloads.save({ filename: name, data: json }); toast('Копия сохранена'); } catch (e) { toast('Сохранение отменено'); } return; }
-  try { await navigator.clipboard.writeText(json); toast('Скачивание недоступно, копия скопирована в буфер'); }
-  catch (e) { toast('Скачивание здесь недоступно'); }
+  if (!TG) {   // an ordinary browser saves a file
+    try { const a = document.createElement('a'), url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000); toast('Копия скачана'); return; } catch (e) {}
+  }
+  // Telegram's in-app browser cannot save files: the copy is shown as text to copy and keep, e.g. in "Избранное".
+  exportText = json; renderProfile();
+  try { await navigator.clipboard.writeText(json); toast('Копия скопирована. Сохрани её, например, в «Избранное» Telegram'); }
+  catch (e) { toast('Скопируй текст копии из поля ниже'); }
+}
+function restoreFrom(text) {
+  let data; try { data = JSON.parse(text); } catch (e) { data = null; }
+  if (!data || typeof data !== 'object' || !Array.isArray(data.bills) || !Array.isArray(data.spends)) { toast('Это не похоже на копию из этого приложения'); return; }
+  undoable('Данные загружены из копии', () => { S = migrate(Object.assign(data, { onboarded: true })); cardMark(); shownCells = null; exportText = ''; });
 }
 view = (() => { const h = location.hash.slice(1); if (h === 'income') return 'money'; return TABS.some(t => t[0] === h) ? h : 'home'; })();
-let cached = null;
+let cached = null, booted = !TG, cloudReady = false, cloudTorn = false;
 try { const ls = LSKEY && localStorage.getItem(LSKEY); if (ls) cached = JSON.parse(ls); } catch (e) {}
 if (cached) { S = migrate(cached); mode = 'local'; }
 render();
@@ -2404,20 +2602,45 @@ async function tgBoot() {
   me = { name: cleanName([u.first_name, u.last_name].filter(Boolean).join(' ')), avatarUrl: safeImg(u.photo_url),
     handle: /^[A-Za-z0-9_]{3,32}$/.test(String(u.username || '')) ? String(u.username) : '' };
   let ok = false; try { ok = !!TG.CloudStorage && (!TG.isVersionAtLeast || TG.isVersionAtLeast('6.9')); } catch (e) {}
-  if (!ok) { goLocal('Сохраняется только на этом устройстве'); return; }
-  try {
-    const raw = await Promise.race([tgLoad(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]);
-    tgCloud = true; mode = 'tg';
-    if (raw) { S = migrate(raw); lastJson = canon(S); lsSave(lastJson); }
-    else if (S.onboarded) { dirty = true; flush(); }          // first run in Telegram: move this device's data up
-    setSync('ok', 'Всё сохранено');
-    if (!S.onboarded && !onb) startOnb(); else { render(); stampDay(); }
-  } catch (e) {
-    // Cloud copy unreadable (interrupted save or no network): keep working from this device and rewrite it on the next save.
-    tgCloud = true; mode = 'tg'; tgParts = [];
-    setSync('warn', 'Облако не ответило, показываю данные с этого устройства');
-    if (!S.onboarded && !onb) startOnb(); else { render(); stampDay(); }
+  if (!ok) { booted = true; goLocal('Сохраняется только на этом устройстве'); return; }
+  try { TG.onEvent('deactivated', flushNow); } catch (e) {}
+  await tgConnect(0);
+}
+// Reads the cloud and decides which copy is newer:
+//  - nothing changed here since the last sync → the cloud copy is taken;
+//  - changes made here and the cloud is still the copy they were made on (or empty) → this device's copy is sent up;
+//  - changes here, but the cloud was changed elsewhere (or this device never synced) → the cloud copy wins and the
+//    person is told, since the other device's data cannot be guessed back.
+// If the cloud does not answer, nothing is written to it: the device keeps working and retries the read.
+async function tgConnect(attempt) {
+  let got;
+  try { got = await Promise.race([tgRead(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]); }
+  catch (e) {
+    const torn = e && e.message === 'checksum';
+    // This device's own save was cut off: the cloud still names the copy this device started from.
+    // Or the cloud stayed unreadable through several tries while this device has data: it is rebuilt from here.
+    if (torn && e.h && e.h === lsGet(BKEY) && S.onboarded) {
+      tgCloud = true; mode = 'tg'; booted = true; tgParts = []; dirty = true; cloudTorn = false;
+      setSync('', 'Сохраняю…'); if (!attempt) { if (!S.onboarded && !onb) startOnb(); else { render(); stampDay(); } }
+      flush(); return;
+    }
+    mode = 'local'; booted = true; cloudTorn = torn && S.onboarded; if (cloudTorn && view === 'profile') renderProfile();
+    setSync('warn', torn ? 'Копия в облаке сейчас не читается. Данные сохраняются на этом устройстве, повторю' : 'Облако не ответило. Изменения сохраняются на этом устройстве и уйдут в облако, когда оно ответит');
+    if (!attempt) { if (!S.onboarded && !onb) startOnb(); else { render(); stampDay(); } }
+    setTimeout(() => tgConnect(attempt + 1), Math.min(60000, 5000 * 2 ** Math.min(attempt, 4)));
+    return;
   }
+  const pending = !!lsGet(PKEY), base = lsGet(BKEY) || '';
+  tgCloud = true; mode = 'tg'; booted = true; tgParts = got.parts;
+  let note = '';
+  if (got.raw && !(pending && base && base === got.h)) {
+    if (pending && S.onboarded) note = 'На другом устройстве были изменения: показываю их. Последнее, что ты записал здесь, могло не сохраниться';
+    onb = null; S = migrate(got.raw); rev++; lastJson = canon(S); lsSave(lastJson); lsPut(BKEY, got.h); lsPut(PKEY, null); dirty = false;
+  } else if (S.onboarded || pending) { dirty = true; }        // first run in Telegram, or this device has the newer copy
+  setSync('ok', 'Всё сохранено');
+  if (!S.onboarded && !onb) startOnb(); else { render(); stampDay(); }
+  if (note) toast(note);
+  if (dirty) flush();
 }
 (async () => {
   if (TG) { await tgBoot(); return; }
@@ -2429,15 +2652,26 @@ async function tgBoot() {
   let first = true;
   const timer = setTimeout(() => { if (first) goLocal('Облако пока не отвечает, работаю с этого устройства'); }, 10000);
   dbRef.onSnapshot(snap => {
-    if (snap.metadata.hasPendingWrites || saving || dirty) return;
+    if (snap.metadata.hasPendingWrites || saving) return;
     if (snap.metadata.fromCache && !snap.exists) return;
-    if (!snap.metadata.fromCache) { clearTimeout(timer); setSync('ok', 'Всё сохранено'); }
+    if (!snap.metadata.fromCache) {
+      clearTimeout(timer); setSync('ok', 'Всё сохранено');
+      if (!cloudReady) {
+        cloudReady = true; booted = true;
+        // Changes made here before the server answered win only if the server still has the copy they were made on.
+        const sh = snap.exists ? hash(canon(snap.data())) : '', pend = !!lsGet(PKEY), base = lsGet(BKEY) || '';
+        if (pend && S.onboarded && (!snap.exists || sh === base)) { dirty = true; flush(); first = false; mode = 'cloud'; render(); stampDay(); return; }
+        if (pend && snap.exists && S.onboarded) toast('На другом устройстве были изменения: показываю их. Последнее, что ты записал здесь, могло не сохраниться');
+        dirty = false; lsPut(PKEY, null);
+      }
+    }
+    if (dirty) { if (cloudReady) flush(); return; }
     mode = 'cloud';
     if (snap.exists) {
       const json = canon(snap.data());
       if (json !== lastJson || first) {
         const raw = JSON.parse(json), needsMigrate = !raw.v || raw.v < 2;
-        S = migrate(raw); lastJson = json; lsSave(json);
+        S = migrate(raw); rev++; lastJson = json; lsSave(json); if (!snap.metadata.fromCache) lsPut(BKEY, hash(json));
         if (!S.onboarded && !onb) startOnb(); else { render(); if (needsMigrate) commit(); }
         if (first) stampDay();
       }
