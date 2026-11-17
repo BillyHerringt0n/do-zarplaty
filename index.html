@@ -1728,13 +1728,19 @@ function commit(msg) {
   checkCele();
   render(); if (msg) toast(msg);
   lastJson = canon(S);
-  try { localStorage.setItem('dolg-state', lastJson); } catch (e) {}
+  lsSave(lastJson);
   if (!dbRef && !tgCloud) return;
   dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(flush, tgCloud ? 1500 : 600);
 }
 // Telegram CloudStorage keeps small string values per user and bot, so the state is stored in
 // numbered pieces; only pieces that changed are written. "meta" holds the count and a checksum.
 const TG = (() => { try { const w = window.Telegram && window.Telegram.WebApp; return w && w.initData ? w : null; } catch (e) { return null; } })();
+// The device copy belongs to one Telegram account: several accounts on one phone share this
+// storage, so the key carries the account id and the old shared key is never read inside Telegram.
+const TGID = (() => { try { const id = String(TG && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.id || ''); return /^\d{1,20}$/.test(id) ? id : ''; } catch (e) { return ''; } })();
+const LSKEY = TG ? (TGID ? 'dolg-state:tg:' + TGID : '') : 'dolg-state';
+if (TG) try { localStorage.removeItem('dolg-state'); } catch (e) {}
+function lsSave(json) { if (LSKEY) try { localStorage.setItem(LSKEY, json); } catch (e) {} }
 let tgCloud = false, tgParts = [];
 const tgCall = (m, ...a) => new Promise((res, rej) => { try { TG.CloudStorage[m](...a, (err, v) => err ? rej(new Error(String(err))) : res(v)); } catch (e) { rej(e); } });
 const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
@@ -2123,7 +2129,7 @@ async function exportData() {
 }
 view = (() => { const h = location.hash.slice(1); if (h === 'income') return 'money'; return TABS.some(t => t[0] === h) ? h : 'home'; })();
 let cached = null;
-try { const ls = localStorage.getItem('dolg-state'); if (ls) cached = JSON.parse(ls); } catch (e) {}
+try { const ls = LSKEY && localStorage.getItem(LSKEY); if (ls) cached = JSON.parse(ls); } catch (e) {}
 if (cached) { S = migrate(cached); mode = 'local'; }
 render();
 
@@ -2164,7 +2170,7 @@ async function tgBoot() {
   try {
     const raw = await Promise.race([tgLoad(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]);
     tgCloud = true; mode = 'tg';
-    if (raw) { S = migrate(raw); lastJson = canon(S); try { localStorage.setItem('dolg-state', lastJson); } catch (e) {} }
+    if (raw) { S = migrate(raw); lastJson = canon(S); lsSave(lastJson); }
     else if (S.onboarded) { dirty = true; flush(); }          // first run in Telegram: move this device's data up
     setSync('ok', 'Всё сохранено');
     if (!S.onboarded && !onb) startOnb(); else { render(); stampDay(); }
@@ -2193,7 +2199,7 @@ async function tgBoot() {
       const json = canon(snap.data());
       if (json !== lastJson || first) {
         const raw = JSON.parse(json), needsMigrate = !raw.v || raw.v < 2;
-        S = migrate(raw); lastJson = json; try { localStorage.setItem('dolg-state', json); } catch (e) {}
+        S = migrate(raw); lastJson = json; lsSave(json);
         if (!S.onboarded && !onb) startOnb(); else { render(); if (needsMigrate) commit(); }
         if (first) stampDay();
       }
