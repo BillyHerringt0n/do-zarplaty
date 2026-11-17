@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CNmy5D+nRt9XCYzB9VjOrK/71aDr9DCV1CGEdnrwjzc=' https://telegram.org/js/telegram-web-app.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://t.me https://*.telegram.org https://*.telesco.pe https://*.telegram-cdn.org; connect-src https://www.cbr-xml-daily.ru; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nwVO4aRdBfV6/FzJPvPqk2bxhk3vq7F8NXLTfmY42Aw=' https://telegram.org/js/telegram-web-app.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://t.me https://*.telegram.org https://*.telesco.pe https://*.telegram-cdn.org; connect-src https://www.cbr-xml-daily.ru; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#121514">
 <title>До зарплаты</title>
@@ -2025,6 +2025,7 @@ const parsePaydays = s => [...new Set(String(s).split(/[^\d]+/).map(Number).filt
 
 /* ---------- keep half-typed input across re-renders ---------- */
 const qs = sel => { try { return document.querySelector(sel); } catch (e) { return null; } };
+const inView = sel => { try { const r = $('v-' + (onb ? 'onb' : view)); return r && r.querySelector ? r.querySelector(sel) : null; } catch (e) { return null; } };
 const KEEP = ['spCat', 'spAmt', 'spNote', 'spDate', 'inEarn', 'inSave', 'inDate', 'rpAmt', 'gdAmt', 'catNew'];
 function keep(fn) {
   return function (...a) {
@@ -2036,7 +2037,7 @@ function keep(fn) {
     const r = fn.apply(this, a);
     for (const id in v) { const el = $(id); if (el && v[id] !== '') el.value = v[id]; }
     if (act && KEEP.includes(act)) { const el = $(act); if (el && document.activeElement !== el) el.focus(); }
-    else if (sig) { const el = qs((ae.tagName || '').toLowerCase() + sig); if (el && document.activeElement !== el) try { el.focus({ preventScroll: true }); } catch (x) {} }
+    else if (sig) { const el = inView((ae.tagName || '').toLowerCase() + sig); if (el && document.activeElement !== el) try { el.focus({ preventScroll: true }); } catch (x) {} }
     const box2 = qs('.csvbox'); if (box2 && boxTop) box2.scrollTop = boxTop;
     updFree();
     return r;
@@ -2436,7 +2437,7 @@ document.addEventListener('click', e => {
     if (+d.onbStep < 0) { onbStep--; render(); return; }
     if (onbSteps()[onbStep] === 'pay') {
       const pm = onb.payMode || 'days';
-      const el = document.querySelector('[data-pay="paydays"]'); if (el && (pm === 'days' || pm === 'monthly')) onb.paydays = parsePaydays(el.value).slice(0, pm === 'monthly' ? 1 : 8);
+      const el = inView('[data-pay="paydays"]'); if (el && (pm === 'days' || pm === 'monthly')) onb.paydays = parsePaydays(el.value).slice(0, pm === 'monthly' ? 1 : 8);
       if ((pm === 'days' || pm === 'monthly') && !(onb.paydays || []).length) { toast('Укажи, каким числом приходит зарплата'); return; }
       if (pm === 'biweekly' && !onb.payAnchor) { toast('Укажи дату любой из зарплат'); return; }
       if (pm === 'manual' && !onb.payNext) { toast('Укажи, когда ждёшь следующий доход'); return; }
@@ -2486,7 +2487,14 @@ document.addEventListener('input', e => {
     $('chartBox').innerHTML = chart(base, wi, today0());
   }
 });
-document.addEventListener('change', e => {
+let tapping = false, tapQ = [];
+const flushTap = () => { tapping = false; const q = tapQ; tapQ = []; for (const f of q) f(); };
+document.addEventListener('pointerdown', () => { tapping = true; }, true);
+document.addEventListener('click', () => { if (tapping) setTimeout(flushTap, 0); }, true);
+document.addEventListener('pointercancel', () => setTimeout(flushTap, 0), true);
+const afterTap = fn => { if (tapping) { tapQ.push(fn); setTimeout(() => { if (tapQ.length) flushTap(); }, 700); } else fn(); };
+document.addEventListener('change', e => afterTap(() => onFieldChange(e)));
+function onFieldChange(e) {
   const t = e.target, T = onb || S;
   if (t.id === 'whatIfNum') { whatIf = Math.max(0, Math.min(1e7, Math.round(+t.value || 0))); const y = scrollY; renderDebt(); scrollTo(0, y); return; }
   if (t.id === 'whatIf') { const y = scrollY; renderDebt(); scrollTo(0, y); const r = $('whatIf'); if (r) r.focus(); return; }
@@ -2519,7 +2527,7 @@ document.addEventListener('change', e => {
     if (k === 'paydays' && !parsePaydays(t.value).length) { toast('Укажи хотя бы одно число месяца, например 1 или 10, 25'); t.value = (T.paydays || []).join(', '); return; }
     T[k] = k === 'paydays' ? parsePaydays(t.value).slice(0, T.payMode === 'monthly' ? 1 : 8) : k === 'payWeekday' ? +t.value : t.value;
     if (T.payMode === 'manual') T.skip = 0;
-    if (onb) render(); else commit('Сохранено');
+    if (!onb) commit('Сохранено');
   }
   if (t.dataset.habit) { const x = S.habits.find(b => b.id === t.dataset.habit); if (x) { x[t.dataset.f] = val; commit(); } }
   if (t.dataset.one) { const x = S.oneoffs.find(b => b.id === t.dataset.one); if (x) { x[t.dataset.f] = val; commit(); } }
@@ -2546,7 +2554,7 @@ document.addEventListener('change', e => {
     r.onload = () => restoreFrom(String(r.result || ''));
     r.readAsText(file);
   }
-});
+}
 
 /* ---------- boot ---------- */
 let rateFail = false;
