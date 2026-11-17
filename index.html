@@ -596,7 +596,9 @@ function sanitize(s) {
   s.debts = sarr(s.debts, 20).map(d => ({ id: sid(d.id), name: sstr(d.name, 40), balance: snum(d.balance), apr: snum(d.apr, 0, 1000), min: snum(d.min), day: day(d.day), paid: paid(d.paid), io: d.io === undefined ? !(+d.apr > 0) && +d.min > 0 : !!d.io,
     kind: d.kind === 'card' || (d.kind === undefined && /кредитк|карт/i.test(String(d.name))) ? 'card' : 'loan', limit: snum(d.limit), graceDate: sdate(d.graceDate), graceLeft: snum(d.graceLeft) }));
   s.payCard = s.debts.some(d => d.id === s.payCard && d.kind === 'card') ? s.payCard : '';
-  s.cardSeen = s.cardSeen !== null && s.cardSeen !== '' && s.cardSeen !== undefined && isFinite(+s.cardSeen) ? snum(s.cardSeen, -1e12) : s.balance;
+  const fin = v => v !== null && v !== '' && v !== undefined && isFinite(+v);
+  s.cardSeen = fin(s.cardSeen) ? snum(s.cardSeen, -1e12) : s.balance;
+  s.cardDebtSeen = fin(s.cardDebtSeen) ? snum(s.cardDebtSeen) : +((s.debts.find(d => d.id === s.payCard) || {}).balance) || 0;
   s.goals = sarr(s.goals, 20).map(g => ({ id: sid(g.id), name: sstr(g.name, 30) || 'Цель', target: snum(g.target), monthly: snum(g.monthly), extra: snum(g.extra, -1e12) }));
   s.bills = sarr(s.bills, 60).map(b => ({ id: sid(b.id), name: sstr(b.name, 40), amount: snum(b.amount), day: day(b.day), paid: paid(b.paid) }));
   s.habits = sarr(s.habits, 30).map(h => ({ id: sid(h.id), name: sstr(h.name, 24), amount: snum(h.amount), every: snum(h.every, 0.5, 365) || 1 }));
@@ -635,28 +637,44 @@ function migrate(s) {
   // An older statement reader took the summary line "Баланс на 12.11.26 −219 499,52" for a spend: such rows
   // (their note is exactly what is left of that line) are dropped. Interest and bank fees it imported as
   // everyday spending move to "Проценты и комиссии" and count as obligatory, not as money spent on living.
-  s.spends = s.spends.filter(x => !(x.note && /^(баланс|остаток|задолженность) на( •.*)?$/i.test(x.note.trim())));
+  s.spends = s.spends.filter(x => !(x.note && (/^(баланс|остаток|задолженность) на( •.*)?$/i.test(x.note.trim())
+    || (!x.planned && x.cat === 'Другое' && /^(баланс|остаток|задолженность|кредитный лимит)\s+на(?=\s|$)(?!\s*(телефон|сч[её]т|карт))/i.test(x.note.trim())))));
   for (const x of s.spends) if (!x.planned && x.cat === 'Другое' && x.note && BANK_FEE.test(x.note.trim())) { x.planned = true; x.cat = BANK_CAT; }
   const total = s.debts.reduce((a, d) => a + (+d.balance || 0), 0);
   if (!(+s.debtStart > 0)) s.debtStart = total + (+s.potUsed || 0);
   if (!s.scen || typeof s.scen !== 'object') s.scen = s.onboarded ? { debt: s.debts.length > 0, save: s.goals.length > 0, irregular: s.payMode === 'manual' } : null;
   return s;
 }
-// Paying with a credit card: "balance" stays the person's own money for living, and the card's debt moves
-// by exactly as much as that money changes (a spend adds to the debt, income put on the card lowers it).
-// Every action already changes S.balance, so following that one number keeps the card right after any
-// spend, income, edit, deletion or undo.
+// Paying with a credit card. With the card's limit known, "balance" is what the bank app shows for the
+// card — the available amount — and the debt is always limit − available: a spend lowers the available
+// amount and raises the debt, income put on the card does the opposite, and paying the debt from savings
+// frees up the same amount. Without a limit, "balance" is the person's own money and the debt moves by as
+// much as that money changes. Every action already changes S.balance or the debt, so following those two
+// numbers keeps the card right after any spend, income, edit, deletion or undo.
 const payCardDebt = () => S.payCard ? S.debts.find(d => d.id === S.payCard && d.kind === 'card') || null : null;
+const cardAvailMode = () => { const d = payCardDebt(); return !!(d && +d.limit > 0); };
+const r2 = v => Math.round(v * 100) / 100;
 function syncCard() {
-  const d = payCardDebt(), seen = +S.cardSeen;
-  if (d && isFinite(seen)) {
-    const delta = seen - S.balance;
-    if (Math.abs(delta) >= 0.005) {
-      d.balance = Math.max(0, Math.round(((+d.balance || 0) + delta) * 100) / 100);
-      if (delta < 0 && +d.graceLeft > 0) d.graceLeft = Math.max(0, Math.round((d.graceLeft + delta) * 100) / 100);
+  const d = payCardDebt();
+  if (d) {
+    const seenBal = +S.cardSeen, seenDebt = +S.cardDebtSeen, debtNow = +d.balance || 0;
+    if (+d.limit > 0 && isFinite(seenDebt) && Math.abs(debtNow - seenDebt) >= 0.005) S.balance = r2(S.balance - (debtNow - seenDebt));
+    else if (isFinite(seenBal)) {
+      const delta = seenBal - S.balance;
+      if (Math.abs(delta) >= 0.005) {
+        d.balance = Math.max(0, r2(debtNow + delta));
+        if (delta < 0 && +d.graceLeft > 0) d.graceLeft = Math.max(0, r2(d.graceLeft + delta));
+      }
     }
   }
-  S.cardSeen = S.balance;
+  cardMark();
+}
+function cardMark() { const d = payCardDebt(); S.cardSeen = S.balance; S.cardDebtSeen = d ? +d.balance || 0 : 0; }
+// What a debt takes out of the money until payday. For the card being paid with, the minimum payment is
+// made by topping the card up from income or savings, so only the bank's interest comes out of it.
+function dueAmt(d) {
+  if (S.payCard === d.id && d.kind === 'card') return Math.round(+d.apr > 0 ? (+d.balance || 0) * d.apr / 1200 : d.io ? +d.min || 0 : 0);
+  return +d.min || 0;
 }
 const totalDebt = () => S.debts.reduce((a, d) => a + Math.max(0, +d.balance || 0), 0);
 
@@ -734,10 +752,10 @@ function calc(skip = S.skip) {
     if (!o.paid) billsSum += +b.amount || 0;
     events.push({ date: o.date, what: b.name, amount: +b.amount || 0, bill: b, key: o.key, done: o.paid });
   }
-  for (const d of S.debts) if (+d.min > 0) for (const o of dueDates(d, t, target, true)) {
-    if (!o.paid) billsSum += +d.min;
-    events.push({ date: o.date, what: d.name, sub: 'мин. платёж', amount: +d.min, debt: d, key: o.key, done: o.paid });
-  }
+  for (const d of S.debts) { const amt = dueAmt(d); if (amt > 0) for (const o of dueDates(d, t, target, true)) {
+    if (!o.paid) billsSum += amt;
+    events.push({ date: o.date, what: d.name, sub: S.payCard === d.id ? 'проценты банка, спишутся с карты' : 'мин. платёж', amount: amt, debt: d, key: o.key, done: o.paid });
+  } }
   let habitsSum = 0; const habitRows = [];
   for (const h of S.habits) {
     const n = Math.ceil(days / Math.max(0.5, +h.every || 1)), sum = n * (+h.amount || 0);
@@ -891,7 +909,7 @@ function renderNav() {
   bc.hidden = mode === 'loading';
   bc.className = 'balchip' + (S.balance < 0 ? ' neg' : '');
   bc.innerHTML = `${ic('wallet')}${rub(S.balance)}`;
-  bc.title = payCardDebt() ? 'Свои деньги на жизнь. Нажми, чтобы изменить' : 'На карте сейчас. Нажми, чтобы сверить с банком';
+  bc.title = cardAvailMode() ? 'Доступно на кредитке. Нажми, чтобы сверить с банком' : payCardDebt() ? 'Свои деньги на жизнь. Нажми, чтобы изменить' : 'На карте сейчас. Нажми, чтобы сверить с банком';
 }
 function go(v) {
   if (v === 'income') v = 'money';
@@ -971,9 +989,9 @@ function renderHome() {
         <div class="segbar ${segCls}" aria-hidden="true">${segs}</div>
         ${c.leftToday < 0 ? `<div class="banner bad">${ic('alert')}<div><b>Перерасход ${rub(-c.leftToday)}</b><p class="note">Если сегодня больше не тратить, с завтра лимит будет ${rub(Math.max(0, c.nextDay))} в день.</p></div></div>` : ''}
         <div class="stats">
-          <div><span class="s">${payCardDebt() ? 'Свои деньги на жизнь' : 'На карте'}</span>
+          <div><span class="s">${cardAvailMode() ? 'Доступно на карте' : payCardDebt() ? 'Свои деньги на жизнь' : 'На карте'}</span>
             ${editBal && editBal !== 'card' ? `<form class="editbal" id="balForm"><input id="balNew" type="number" inputmode="decimal" step="any" value="${Math.round(S.balance)}" aria-label="Сколько сейчас на карте"><button class="primary" type="submit" aria-label="Сохранить">${ic('check')}</button></form>`
-              : `<span class="v num">${rub(S.balance)}</span><button class="linkbtn" data-editbal="1">${payCardDebt() ? 'изменить' : 'сверить с банком'}</button>`}</div>
+              : `<span class="v num">${rub(S.balance)}</span><button class="linkbtn" data-editbal="1">${payCardDebt() && !cardAvailMode() ? 'изменить' : 'сверить с банком'}</button>`}</div>
           <div><span class="s">Свободно до ${fmtD(c.target)}</span><span class="v num ${c.free < 0 ? 'neg' : ''}">${rub(c.free)}</span></div>
           <div><span class="s">В день в среднем</span><span class="v num">${rub(Math.max(0, c.perDay))}</span></div>
         </div>
@@ -1241,6 +1259,11 @@ function renderBills() {
 
 function cardLine() {
   const cd = payCardDebt(); if (!cd) return '';
+  if (+cd.limit > 0) {
+    const due = +cd.min > 0 && +cd.day >= 1 ? dueDates(cd, today0(), addDays(today0(), 40)).find(o => !o.paid) : null;
+    return `<div class="cardline">${ic('wallet')}<div><b>Долг по карте ${rub(cd.balance)}</b><span class="note"> · лимит ${rub(cd.limit)}</span>
+      <p class="note">«Доступно» — деньги банка: трата увеличивает долг, пополнение уменьшает. Долг = лимит − доступно.${due ? ` Мин. платёж ${rub(cd.min)} до ${fmtD(due.date)}: пополни карту на эту сумму из дохода или копилки.` : ''}</p></div></div>`;
+  }
   const avail = +cd.limit > 0 ? Math.max(0, cd.limit - cd.balance) : null;
   return `<div class="cardline">${ic('wallet')}<div><b>Кредитная карта «${esc(cd.name)}»: долг ${rub(cd.balance)}</b>${avail !== null ? `<span class="note"> · доступно ${rub(avail)} из ${rub(cd.limit)}</span>` : ''}
     ${editBal === 'card' ? `<form class="editbal" id="cardForm" style="margin-top:6px"><input id="cardNew" type="number" inputmode="decimal" step="any" min="0" value="${Math.round(cd.balance * 100) / 100}" aria-label="Задолженность по карте из банка"><button class="primary" type="submit" aria-label="Сохранить">${ic('check')}</button></form>`
@@ -1651,7 +1674,7 @@ function linesToRows(lines) {
     const rest = t.replace(/\b\d{2}[./]\d{2}[./](\d{4}|\d{2})\b/g, ' ').replace(/\b\d{1,2}:\d{2}(:\d{2})?\b/g, ' ');
     const am = rest.match(AMT); if (!am) continue;
     const raw = am[0];                                      // the first amount is the operation; later ones are usually the balance
-    out.push(last = { date, amount: parseNum(raw), plus: /^\s*\+/.test(raw), desc: rest.replace(AMT, ' ').replace(/[₽]|\bRUB\b|\bруб\.?/gi, ' ').replace(/\s+/g, ' ').trim() });
+    out.push(last = { date, amount: parseNum(raw), plus: /^\s*\+/.test(raw), desc: rest.replace(AMT, ' ').replace(/[₽]|\bRUB\b|(?<![А-Яа-яЁё])руб\.?(?![А-Яа-яЁё])/gi, ' ').replace(/\s+/g, ' ').trim() });
   }
   return finishRows(out);
 }
@@ -1981,9 +2004,13 @@ document.addEventListener('submit', e => {
     cd.balance = nb; commit(`Долг по «${cd.name}» сверен: ${rub(nb)}`); return;
   }
   if (f.id === 'balForm' && payCardDebt()) {
-    const v = $('balNew').value; editBal = false; if (v === '') { render(); return; }
-    S.balance = isFinite(+v) ? +v : 0; S.cardSeen = S.balance;   // own money set by hand does not move the card
-    commit('Сумма на жизнь обновлена'); return;
+    const cd = payCardDebt(), v = $('balNew').value; editBal = false; if (v === '') { render(); return; }
+    S.balance = isFinite(+v) ? +v : 0;
+    if (+cd.limit > 0) {   // the bank shows what is available; the debt is the rest of the limit
+      const nd = Math.max(0, r2(cd.limit - S.balance)); if (nd > (+cd.balance || 0)) S.debtStart = (+S.debtStart || 0) + (nd - (+cd.balance || 0));
+      cd.balance = nd;
+    }
+    cardMark(); commit(+cd.limit > 0 ? `Доступно ${rub(S.balance)}, долг по карте ${rub(cd.balance)}` : 'Сумма на жизнь обновлена'); return;
   }
   if (f.id === 'balForm') {
     const v = $('balNew').value; if (v === '') return;
@@ -2021,7 +2048,7 @@ document.addEventListener('submit', e => {
     const d = S.debts.find(x => x.id === $('rpDebt').value) || S.debts[0]; if (!d) return;
     const before = progress().paidCells; $('rpAmt').value = '';
     const pay = Math.min(a, Math.max(0, +d.balance || 0)); if (!(pay > 0)) { toast('Этот долг уже закрыт'); return; }
-    const fromPot = Math.min(pay, potInfo().pot), fromCard = pay - fromPot;
+    const own = S.payCard === d.id, fromPot = Math.min(pay, potInfo().pot), fromCard = own ? 0 : pay - fromPot;
     d.balance = Math.max(0, (+d.balance || 0) - pay); S.potUsed = (+S.potUsed || 0) + fromPot; S.balance -= fromCard;
     const after = progress().paidCells, src = fromCard > 0 ? ` (из копилки ${rub(fromPot)}, с карты ${rub(fromCard)})` : '';
     commit((after > before ? `Закрашено ещё ${after - before} ${plural(after - before,'клетка','клетки','клеток')}` : `Долг меньше на ${rub(pay)}`) + src);
@@ -2065,8 +2092,10 @@ document.addEventListener('click', e => {
   if (d.wiApply) { S.planMonthly = Math.round(monthlySave().save + whatIf); whatIf = 0; commit(`План обновлён: ${rub(S.planMonthly)} в месяц`); return; }
   if (d.dkind) { const x = S.debts.find(z => z.id === d.id); if (x && x.kind !== d.dkind) { x.kind = d.dkind; if (x.kind !== 'card' && S.payCard === x.id) S.payCard = ''; commit(); } return; }
   if (d.paycard) {
-    const on = S.payCard !== d.paycard; S.payCard = on ? d.paycard : ''; S.cardSeen = S.balance;
-    commit(on ? 'Теперь траты и доходы двигают долг по этой карте' : 'Карта больше не следит за тратами'); return;
+    const on = S.payCard !== d.paycard; S.payCard = on ? d.paycard : ''; const cd = payCardDebt();
+    if (cd && +cd.limit > 0) { const nd = Math.max(0, r2(cd.limit - S.balance)); if (nd > (+cd.balance || 0)) S.debtStart = (+S.debtStart || 0) + (nd - (+cd.balance || 0)); cd.balance = nd; }
+    cardMark();
+    commit(!on ? 'Карта больше не следит за тратами' : cd && +cd.limit > 0 ? `Долг по карте: лимит ${rub(cd.limit)} − доступно ${rub(S.balance)} = ${rub(cd.balance)}` : 'Теперь траты и доходы двигают долг по этой карте'); return;
   }
   if (d.io) { const x = S.debts.find(z => z.id === d.io); if (x) { x.io = !x.io; commit(x.io ? 'Считаю мин. платёж процентами' : 'Мин. платёж гасит долг'); } return; }
   if (d.scen) {
@@ -2105,7 +2134,7 @@ document.addEventListener('click', e => {
   }
   if (d.pay || d.payDebt) {
     const item = d.pay ? S.bills.find(x => x.id === d.pay) : S.debts.find(x => x.id === d.payDebt); if (!item) return;
-    const amt = +(d.pay ? item.amount : item.min) || 0;
+    const amt = +(d.pay ? item.amount : dueAmt(item)) || 0;
     undoable(`${item.name}: оплачено`, () => {
       item.paid = [...(item.paid || []), d.key].slice(-24); S.balance -= amt;
       S.spends.push({ id: uid(), date: ymd(today0()), amount: amt, cat: 'Обязательные', note: item.name, planned: true, ref: { t: d.pay ? 'bill' : 'debt', id: item.id, key: d.key } });
@@ -2150,7 +2179,9 @@ document.addEventListener('click', e => {
     if (m.debt > (+x.balance || 0)) S.debtStart = (+S.debtStart || 0) + (m.debt - (+x.balance || 0));
     x.kind = 'card'; x.balance = m.debt; if (m.limit) x.limit = m.limit; if (m.min) x.min = m.min;
     if (m.payBy) x.day = parse(m.payBy).getDate(); if (m.apr) { x.apr = m.apr; x.io = false; }
-    csvMeta = null; commit(`«${x.name}» обновлён по выписке: долг ${rub(x.balance)}`); return;
+    let msg = `«${x.name}» обновлён по выписке: долг ${rub(x.balance)}`;
+    if (S.payCard === x.id && +x.limit > 0) { x.balance = Math.max(0, r2(x.limit - S.balance)); msg = `По выписке долг был ${rub(m.debt)}, сейчас по доступному остатку ${rub(x.balance)}`; }
+    cardMark(); csvMeta = null; commit(msg); return;
   }
   if (d.csvGo) {
     const on = csvRows.filter(r => r.on); const sum = on.reduce((a, r) => a + r.amount, 0);
@@ -2179,7 +2210,7 @@ document.addEventListener('click', e => {
     onb.debts.forEach((d, i) => { if (!String(d.name).trim()) d.name = onb.debts.length > 1 ? `Долг ${i + 1}` : 'Долг'; });
     onb.goals.forEach((g, i) => { if (!String(g.name).trim() || g.name === 'Моя цель') g.name = onb.goals.length > 1 ? `Цель ${i + 1}` : 'Цель'; });
     const wasStart = +S.debtStart || 0;
-    S = migrate(Object.assign(onb, { onboarded: true })); S.cardSeen = S.balance;   // a new starting balance is not a spend
+    S = migrate(Object.assign(onb, { onboarded: true })); cardMark();   // a new starting balance is not a spend
     const tot = totalDebt(); if (!wasStart || tot > wasStart) S.debtStart = tot + (+S.potUsed || 0);
     onb = null; shownCells = null; stampDay();
     commit('Готово, лимит посчитан'); go('home'); return;
