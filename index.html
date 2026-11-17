@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://telegram.org; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://t.me https://*.telegram.org https://*.telesco.pe https://*.telegram-cdn.org; connect-src https://www.cbr-xml-daily.ru; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://telegram.org https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://t.me https://*.telegram.org https://*.telesco.pe https://*.telegram-cdn.org; connect-src https://www.cbr-xml-daily.ru; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#121514">
 <title>До зарплаты</title>
@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icon.svg">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root{color-scheme:light;padding-top:var(--sat,env(safe-area-inset-top,0px));padding-bottom:var(--sab,env(safe-area-inset-bottom,0px))}
 body{margin:0;font:14px system-ui,sans-serif}
 img{max-width:100%}
 [hidden]{display:none!important}
@@ -31,6 +31,7 @@ img{max-width:100%}
   --f-mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
   --f-disp:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
   --tabbar:64px;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#121514; --surface:#1a1e1c; --sunk:#151917; --line:#2b312e; --ink:#e7ebe8; --muted:#97a19b;
@@ -40,8 +41,8 @@ img{max-width:100%}
   --accent:#6fb895; --accent-soft:#1f3129; --accent-mid:#3d6b55; --warn:#e0a54a; --warn-soft:#352a16; --bad:#f07a6c; --bad-soft:#3a1f1c; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-sans);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 calc(var(--tabbar) + 32px + env(safe-area-inset-bottom,0px))}
-body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 calc(var(--tabbar) + 32px + var(--sab))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:var(--sat);z-index:10;background:var(--bg)}
 .num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 h1,h2,h3{margin:0;font-weight:600;text-wrap:balance}
 h1{font-size:22px;letter-spacing:-.01em}
@@ -53,7 +54,7 @@ p{margin:0}
 svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
 /* shell */
-.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);max-width:1040px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:14px}
+.top{position:sticky;top:var(--sat);z-index:5;background:var(--bg);max-width:1040px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:14px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600}
 .brand .mark{width:30px;height:30px;border-radius:8px;background:var(--ink);color:var(--bg);display:grid;place-items:center}
 .brand .mark svg{width:17px;height:17px}
@@ -76,7 +77,7 @@ svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-widt
 select{-webkit-appearance:none;appearance:none;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;cursor:pointer}
 .unit select{padding-right:22px;background-position:calc(100% - 9px) 50%,calc(100% - 4px) 50%}
 .tabbar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
-  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));
+  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + var(--sab)) max(8px,env(safe-area-inset-left,0px));
   grid-template-columns:repeat(5,1fr)}
 .tabbar button{border:0;background:transparent;color:var(--muted);flex-direction:column;gap:2px;font-size:11px;padding:6px 0;justify-content:center}
 .tabbar button svg{width:22px;height:22px}
@@ -114,6 +115,7 @@ main{max-width:1040px;margin:0 auto}
 .stats>div{background:var(--surface);padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .stats .v{font-size:17px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .stats .s{font-size:12px;color:var(--muted)}
+.stats .linkbtn{font-size:12px;white-space:normal;text-align:left;align-self:flex-start;line-height:1.3}
 .editbal{display:flex;gap:6px}
 .editbal input{padding:5px 8px;font-size:15px}
 .editbal button{padding:5px 8px}
@@ -164,6 +166,7 @@ main{max-width:1040px;margin:0 auto}
 .ev .d{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
 .ev .what{min-width:0}
 .ev .what small{display:block;font-size:12px;color:var(--muted)}
+.ev .what .num{white-space:nowrap}
 .ev.pay .what{color:var(--accent);font-weight:500}
 .tag{font-size:11px;color:var(--muted);margin-left:6px}
 
@@ -180,7 +183,7 @@ main{max-width:1040px;margin:0 auto}
 /* editable rows */
 .erow{display:grid;grid-template-columns:minmax(0,1fr) 120px 92px auto 32px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
 .erow:last-child{border-bottom:0}
-.erow.h{grid-template-columns:minmax(0,1fr) 120px 100px 32px}
+.erow.h{grid-template-columns:minmax(0,1fr) 120px 150px 32px}
 .erow.q{grid-template-columns:minmax(0,1fr) 110px 130px 32px}
 .erow.c{grid-template-columns:minmax(0,1fr) 150px 32px}
 .unit{display:flex;align-items:center;gap:4px;border:1px solid transparent;border-radius:8px;padding:0 8px;background:var(--sunk);min-width:0}
@@ -189,6 +192,8 @@ main{max-width:1040px;margin:0 auto}
 .unit select{text-align:left}
 .unit input:focus-visible,.unit select:focus-visible{outline:0}
 .unit span{font-size:12px;color:var(--muted);white-space:nowrap}
+.unit.date input{text-align:left}
+.unit.need,input.need{box-shadow:inset 0 0 0 1.5px var(--warn)}
 .plain{border:1px solid transparent;background:transparent;padding:7px 8px;font-weight:500}
 .plain:hover{border-color:var(--line)} .plain:focus{border-color:var(--ink);background:var(--sunk)}
 .toggle{font-size:12px;padding:5px 10px;border-radius:999px}
@@ -293,7 +298,7 @@ button.danger.armed{background:var(--bad);color:var(--surface);border-color:var(
 .presets{display:flex;flex-wrap:wrap;gap:6px}
 body.onboarding .tabbar,body.onboarding .tabs,body.onboarding .topright{display:none!important}
 
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabbar) + 20px + env(safe-area-inset-bottom,0px));z-index:7;background:var(--ink);color:var(--bg);padding:8px 8px 8px 16px;border-radius:999px;font-size:14px;max-width:calc(100% - 32px);display:flex;align-items:center;gap:10px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabbar) + 20px + var(--sab));z-index:7;background:var(--ink);color:var(--bg);padding:8px 8px 8px 16px;border-radius:999px;font-size:14px;max-width:calc(100% - 32px);display:flex;align-items:center;gap:10px}
 .toast:not(:has(button)){padding-right:16px}
 .toast button{background:transparent;color:var(--bg);border-color:color-mix(in srgb,var(--bg) 35%,transparent);border-radius:999px;padding:4px 12px;font-size:13px}
 
@@ -437,7 +442,7 @@ input.slider:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1.08)}
 
 <script>
 const DEFAULT = {
-  v: 2, onboarded: false, balance: 0, usdRate: 80, eurRate: 90, ratesAt: '', ratesAuto: false, cele: null, paydays: [1,16], skip: 0,
+  v: 2, onboarded: false, balance: 0, usdRate: 80, eurRate: 90, ratesAt: '', ratesAuto: false, cele: null, paydays: [], skip: 0,
   planMonthly: 0, potUsed: 0, reserve: 0, debtStart: 0,
   cats: ['Еда', 'Транспорт', 'Другое'], catLimits: {}, quick: [],
   debts: [], goals: [], bills: [], habits: [], oneoffs: [], entries: [], spends: [], limits: {},
@@ -490,7 +495,7 @@ const isSalary = e => !e.kind || e.kind === 'salary';
 const $ = id => document.getElementById(id);
 const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const rub = n => { const v = Math.round(+n || 0); return (v < 0 ? '−' : '') + Math.abs(v).toLocaleString('ru-RU') + ' ₽'; };
+const rub = n => { const v = Math.round(+n || 0); return (v < 0 ? '−' : '') + Math.abs(v).toLocaleString('ru-RU') + '\u00A0₽'; };
 const sgn = n => (n > 0 ? '+' : '') + rub(n);
 const uid = () => Math.random().toString(36).slice(2, 9);
 const pad = n => String(n).padStart(2, '0');
@@ -544,7 +549,7 @@ function sanitize(s) {
   const cl = {}; for (const k of Object.keys(s.catLimits || {}).slice(0, 60)) { const v = snum(s.catLimits[k]); if (v > 0) cl[sstr(k, 24)] = v; } s.catLimits = cl;
   const lm = {}; for (const k of Object.keys(s.limits || {}).sort().slice(-70)) if (sdate(k)) lm[k] = snum(s.limits[k]); s.limits = lm;
   const paid = a => (Array.isArray(a) ? a : []).filter(x => /^\d{4}-\d{2}$/.test(String(x))).slice(-24);
-  const day = v => Math.round(snum(v, 1, 31)) || 1;
+  const day = v => { const n = Math.round(+v); return n >= 1 && n <= 31 ? n : 0; };   // 0 = date not set yet
   s.debts = sarr(s.debts, 20).map(d => ({ id: sid(d.id), name: sstr(d.name, 40), balance: snum(d.balance), apr: snum(d.apr, 0, 1000), min: snum(d.min), day: day(d.day), paid: paid(d.paid) }));
   s.goals = sarr(s.goals, 20).map(g => ({ id: sid(g.id), name: sstr(g.name, 30) || 'Цель', target: snum(g.target), monthly: snum(g.monthly), extra: snum(g.extra, -1e12) }));
   s.bills = sarr(s.bills, 60).map(b => ({ id: sid(b.id), name: sstr(b.name, 40), amount: snum(b.amount), day: day(b.day), paid: paid(b.paid) }));
@@ -639,6 +644,7 @@ function periodStartDays(t) {
 // A payment due on payday itself is counted: money may arrive later that day.
 function dueDates(item, from, to, all) {
   const res = [], paid = item.paid || [];
+  if (!(+item.day >= 1)) return res;
   let cur = new Date(from.getFullYear(), from.getMonth(), 1);
   while (cur <= to) {
     const y = cur.getFullYear(), m = cur.getMonth();
@@ -663,7 +669,7 @@ function calc(skip = S.skip) {
   }
   for (const d of S.debts) if (+d.min > 0) for (const o of dueDates(d, t, target, true)) {
     if (!o.paid) billsSum += +d.min;
-    events.push({ date: o.date, what: d.name, sub: 'минималка', amount: +d.min, debt: d, key: o.key, done: o.paid });
+    events.push({ date: o.date, what: d.name, sub: 'мин. платёж', amount: +d.min, debt: d, key: o.key, done: o.paid });
   }
   let habitsSum = 0; const habitRows = [];
   for (const h of S.habits) {
@@ -797,7 +803,7 @@ function payFields(o) {
   const m = o.payMode || 'days';
   const WD = [[1, 'Пн'], [2, 'Вт'], [3, 'Ср'], [4, 'Чт'], [5, 'Пт'], [6, 'Сб'], [0, 'Вс']];
   return `<div class="f full"><span>Доход приходит</span><div class="chips" role="group" aria-label="Как приходит доход">${[['days', 'По числам месяца'], ['weekly', 'Каждую неделю'], ['biweekly', 'Раз в две недели'], ['manual', 'Нерегулярно']].map(([k, v]) => `<button type="button" class="chip" data-paymode="${k}" aria-pressed="${m === k}">${v}</button>`).join('')}</div></div>` +
-    (m === 'days' ? `<label class="f"><span>Числа месяца</span><input data-pay="paydays" inputmode="numeric" value="${(o.paydays || []).join(', ')}" placeholder="1, 16"></label>`
+    (m === 'days' ? `<label class="f"><span>Числа месяца</span><input data-pay="paydays" inputmode="numeric" value="${(o.paydays || []).join(', ')}" placeholder="например, 10 и 25"></label>`
     : m === 'weekly' ? `<div class="f full"><span>День недели</span><div class="chips" role="group" aria-label="День недели">${WD.map(([k, v]) => `<button type="button" class="chip" data-payweekday="${k}" aria-pressed="${+o.payWeekday === k}">${v}</button>`).join('')}</div></div>`
     : m === 'biweekly' ? `<label class="f"><span>Дата любой из зарплат</span><input data-pay="payAnchor" type="date" value="${esc(o.payAnchor || '')}"></label>`
     : `<label class="f"><span>Следующий доход жду</span><input data-pay="payNext" type="date" value="${esc(o.payNext || '')}"></label>`);
@@ -905,6 +911,8 @@ function renderHome() {
           <div><span class="s">В день в среднем</span><span class="v num">${rub(Math.max(0, c.perDay))}</span></div>
         </div>
       </div>
+      ${(() => { const nd = [...S.bills.filter(b => +b.amount > 0), ...S.debts.filter(d => +d.min > 0)].filter(x => !(+x.day >= 1));
+        return nd.length ? `<div class="banner bad">${ic('alert')}<div><b>Не указана дата у ${nd.length} ${plural(nd.length, 'платежа', 'платежей', 'платежей')}</b><p class="note">Пока не учитываются в лимите: ${nd.map(x => esc(x.name || 'Платёж')).join(', ')}. <button class="linkbtn" data-go="${S.bills.some(b => nd.includes(b)) ? 'bills' : 'debt'}">Указать дату</button></p></div></div>` : ''; })()}
       ${yBanner}
       <form class="card" id="spendForm">
         <div class="kv"><h2>${ic('out')}Записать трату</h2>${sk > 0 ? `<span class="pill ok">${ic('bolt')}${sk} ${plural(sk,'день','дня','дней')} в лимите</span>` : ''}</div>
@@ -1033,7 +1041,7 @@ function renderIncome() {
         ${['RUB','USD','EUR'].map(x => `<button type="button" data-cur="${x}" aria-pressed="${incCur === x}">${CUR[x]}</button>`).join('')}</div></div>
       <label class="f"><span id="inEarnLbl">${incKind === 'salary' ? 'Сколько заработал' : 'Сколько пришло'}</span><input id="inEarn" type="number" inputmode="decimal" min="0" step="any" required></label>
       <div class="f"><span>Сколько откладываю</span>
-        <input id="inSave" type="number" inputmode="decimal" min="0" step="any" value="0">
+        <input id="inSave" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
         <div class="chips" style="margin-top:4px">
           <button type="button" class="chip" data-save="1">Всё</button>
           <button type="button" class="chip" data-save="0.5">Половину</button>
@@ -1125,8 +1133,8 @@ function renderSummary() {
 function billRow(b) {
   return `<div class="erow h">
     <input class="plain" data-bill="${b.id}" data-f="name" value="${esc(b.name)}" aria-label="Название">
-    <label class="unit"><input data-bill="${b.id}" data-f="amount" type="number" inputmode="decimal" min="0" value="${b.amount}" aria-label="Сумма"><span>₽</span></label>
-    <label class="unit"><input data-bill="${b.id}" data-f="day" type="number" inputmode="numeric" min="1" max="31" value="${b.day}" aria-label="Число месяца"><span>числа</span></label>
+    <label class="unit"><input data-bill="${b.id}" data-f="amount" type="number" inputmode="decimal" min="0" value="${b.amount || ''}" placeholder="0" aria-label="Сумма"><span>₽</span></label>
+    <label class="unit date${+b.day >= 1 ? '' : ' need'}">${dueInput('data-bill', b.id, b.day, 'Дата платежа')}</label>
     <button class="ghost" data-del-bill="${b.id}" aria-label="Удалить">${ic('x')}</button></div>`;
 }
 function renderBills() {
@@ -1136,16 +1144,16 @@ function renderBills() {
   <div class="cols">
   <div class="stack">
   <div class="card">
-    <div><h2>${ic('cal')}Обязательные, каждый месяц</h2><p class="note" style="margin-top:4px">Связь, подписки, аренда. Минималки по долгам задаются на экране «Долг». Если в месяце нет такого числа, платёж встанет на последний день.</p></div>
+    <div><h2>${ic('cal')}Обязательные, каждый месяц</h2><p class="note" style="margin-top:4px">Связь, подписки, аренда. Минимальные платежи по долгам задаются на экране «Цели». Если в месяце нет такого числа, платёж встанет на последний день.</p></div>
     <div>${S.bills.map(billRow).join('') || '<p class="empty">Нет платежей</p>'}</div>
-    ${S.debts.filter(d => +d.min > 0).map(d => `<div class="row"><span>${esc(d.name)} <span class="tag">минималка, ${d.day} числа</span></span><span class="num">${rub(d.min)}</span></div>`).join('')}
+    ${S.debts.filter(d => +d.min > 0).map(d => `<div class="row"><span>${esc(d.name)} <span class="tag">мин. платёж${+d.day >= 1 ? `, ${d.day}-го числа` : ', дата не указана'}</span></span><span class="num">${rub(d.min)}</span></div>`).join('')}
     <button data-add="bill" style="align-self:flex-start">${ic('plus')}Добавить платёж</button>
   </div>
   <div class="card">
     <div><h2>${ic('cal')}Разовые траты</h2><p class="note" style="margin-top:4px">День рождения, ремонт, поездка. Деньги на них откладываются заранее, если дата раньше зарплаты, до которой дотягиваешь.</p></div>
     <div>${S.oneoffs.filter(o => !o.paid).map(o => `<div class="erow h">
       <input class="plain" data-one="${o.id}" data-f="name" value="${esc(o.name)}" aria-label="Название">
-      <label class="unit"><input data-one="${o.id}" data-f="amount" type="number" inputmode="decimal" min="0" value="${o.amount}" aria-label="Сумма"><span>₽</span></label>
+      <label class="unit"><input data-one="${o.id}" data-f="amount" type="number" inputmode="decimal" min="0" value="${o.amount || ''}" placeholder="0" aria-label="Сумма"><span>₽</span></label>
       <label class="unit"><input data-one="${o.id}" data-f="date" type="date" value="${esc(o.date)}" aria-label="Дата" style="text-align:left"></label>
       <button class="ghost" data-del-one="${o.id}" aria-label="Удалить">${ic('x')}</button></div>`).join('') || '<p class="empty">Нет запланированных</p>'}</div>
     <button data-add="one" style="align-self:flex-start">${ic('plus')}Запланировать</button>
@@ -1155,7 +1163,7 @@ function renderBills() {
     <div><h2>${ic('out')}Регулярные мелочи</h2><p class="note" style="margin-top:4px">Сигареты, проезд, кофе. Они заранее вычитаются из лимита. Покупая, записывай их тратой с этой же категорией.</p></div>
     <div>${S.habits.map(h => `<div class="erow h">
       <input class="plain" data-habit="${h.id}" data-f="name" value="${esc(h.name)}" aria-label="Название">
-      <label class="unit"><input data-habit="${h.id}" data-f="amount" type="number" inputmode="decimal" min="0" value="${h.amount}" aria-label="Цена"><span>₽</span></label>
+      <label class="unit"><input data-habit="${h.id}" data-f="amount" type="number" inputmode="decimal" min="0" value="${h.amount || ''}" placeholder="0" aria-label="Цена"><span>₽</span></label>
       <label class="unit"><span>раз в</span><input data-habit="${h.id}" data-f="every" type="number" inputmode="decimal" min="0.5" step="0.5" value="${h.every}" aria-label="Раз в N дней"><span>дн.</span></label>
       <button class="ghost" data-del-habit="${h.id}" aria-label="Удалить">${ic('x')}</button></div>`).join('') || '<p class="empty">Нет</p>'}</div>
     <button data-add="habit" style="align-self:flex-start">${ic('plus')}Добавить</button>
@@ -1249,14 +1257,16 @@ function renderDebtBody() {
         <div class="debt-head">
           <div><span class="label">Закрою</span><span class="v">${isFinite(base.months) ? monthName(t, base.months) : '—'}</span></div>
           <div><span class="label">Срок</span><span class="v num">${isFinite(base.months) ? base.months + ' мес.' : 'никогда'}</span></div>
-          <div><span class="label">Проценты</span><span class="v num neg">${isFinite(base.months) ? rub(base.interest) : '—'}</span></div>
+          <div><span class="label">Переплата</span><span class="v num neg">${isFinite(base.months) ? rub(base.interest) : '—'}</span></div>
         </div>
+        ${isFinite(base.months) && base.interest > 0 && !S.debts.some(d => +d.apr > 0) ? `<p class="note">Переплата — деньги, которые уйдут банку сверх самого долга. Ставка не указана, поэтому считаю, что мин. платёж каждый месяц целиком уходит на проценты: ${rub(S.debts.reduce((a, d) => a + (+d.min || 0), 0))} × ${monW(base.months)}. Укажи ставку в «Моих долгах», и расчёт станет точнее.</p>` : ''}
         <div id="chartBox">${chart(base, wi, t)}</div>
         <div class="rows">
           <div class="row"><span>Откладываю в месяц <span class="tag">${+S.planMonthly > 0 ? 'мой план' : ms.n ? `оценка по ${ms.n} ${plural(ms.n, 'зарплате', 'зарплатам', 'зарплатам')}` : 'плана нет'}</span></span><span class="num">${rub(ms.save)}</span></div>
           ${!(+S.planMonthly > 0) && ms.n >= 2 && ms.lo < ms.save ? `<div class="row"><span>Если каждый раз как в худшую зарплату <span class="tag">${rub(ms.lo)} в месяц</span></span><span class="num muted">${(m => isFinite(m) ? m + ' мес.' : 'не закроется')(simulate(ms.lo).months)}</span></div>` : ''}
-          <div class="row"><span>Минималки <span class="tag">уходят на проценты</span></span><span class="num">${rub(S.debts.reduce((a, d) => a + (+d.min || 0), 0))}</span></div>
-          <div class="row"><span>Если платить только минималки</span><span class="num muted">${isFinite(minOnly.months) ? minOnly.months + ' мес.' : 'не закроется'}</span></div>
+          <div class="row"><span>${S.debts.filter(d => +d.min > 0).length > 1 ? 'Мин. платежи' : 'Мин. платёж'} в месяц <span class="tag">уходит на проценты</span></span><span class="num">${rub(S.debts.reduce((a, d) => a + (+d.min || 0), 0))}</span></div>
+          ${isFinite(base.months) && base.interest > 0 ? `<div class="row"><span>Откуда переплата <span class="tag">${S.debts.some(d => +d.apr > 0) ? 'проценты по ставке, пока долг гасится' : `мин. платёж × ${monW(base.months)}`}</span></span><span class="num neg">${rub(base.interest)}</span></div>` : ''}
+          <div class="row"><span>Если платить только мин. платёж</span><span class="num muted">${isFinite(minOnly.months) ? minOnly.months + ' мес.' : 'не закроется'}</span></div>
           ${base.closes.length > 1 ? base.closes.map(cl => `<div class="row"><span>${esc(cl.name)} закроется</span><span class="num">${cl.m === 0 ? 'сразу' : monthName(t, cl.m)}</span></div>`).join('') : ''}
         </div>
         ${+S.planMonthly > 0 ? '' : `<div class="banner">${ic('alert')}<div style="flex:1;min-width:0"><b>${ms.n ? rub(ms.save) + ' в месяц — это оценка, а не план' : 'Впиши, сколько сможешь откладывать'}</b>
@@ -1281,10 +1291,10 @@ function renderDebtBody() {
             ${order[0] && order[0].id === d.id && order.length > 1 ? '<span class="pill ok">гасить первым</span>' : ''}
             <button class="ghost" data-del-debt="${d.id}" aria-label="Удалить долг">${ic('x')}</button></div>
           <div class="fgrid">
-            <label class="f"><span>Остаток, ₽</span><input data-debt="${d.id}" data-f="balance" type="number" inputmode="decimal" min="0" value="${Math.round(d.balance)}"></label>
-            <label class="f"><span>Ставка, %</span><input data-debt="${d.id}" data-f="apr" type="number" inputmode="decimal" min="0" step="0.1" value="${d.apr || ''}" placeholder="0"></label>
-            <label class="f"><span>Минималка, ₽</span><input data-debt="${d.id}" data-f="min" type="number" inputmode="decimal" min="0" value="${d.min || ''}" placeholder="0"></label>
-            <label class="f"><span>Число платежа</span><input data-debt="${d.id}" data-f="day" type="number" inputmode="numeric" min="1" max="31" value="${d.day}"></label>
+            <label class="f"><span>Остаток, ₽</span><input data-debt="${d.id}" data-f="balance" type="number" inputmode="decimal" min="0" value="${Math.round(d.balance) || ''}" placeholder="0"></label>
+            <label class="f"><span>Ставка, % годовых</span><input data-debt="${d.id}" data-f="apr" type="number" inputmode="decimal" min="0" step="0.1" value="${d.apr || ''}" placeholder="если знаешь"></label>
+            <label class="f"><span>Мин. платёж в месяц, ₽</span><input data-debt="${d.id}" data-f="min" type="number" inputmode="decimal" min="0" value="${d.min || ''}" placeholder="0"></label>
+            <label class="f"><span>Дата платежа</span>${dueInput('data-debt', d.id, d.day, 'Дата платежа').replace('<input ', `<input class="${+d.min > 0 && !(+d.day >= 1) ? 'need' : ''}" `)}</label>
           </div></div>`).join('') || '<p class="empty">Долгов нет. Добавь, чтобы следить за погашением.</p>'}</div>
         <button data-add="debt" style="align-self:flex-start">${ic('plus')}Добавить долг</button>
       </div>
@@ -1412,7 +1422,7 @@ function renderProfile() {
         <div><h2>${ic('bolt')}Быстрые траты</h2><p class="note" style="margin-top:4px">Кнопки на экране «Сегодня»: одно нажатие, и трата записана.</p></div>
         <div>${S.quick.map(q => `<div class="erow q">
           <input class="plain" data-q="${q.id}" data-f="label" value="${esc(q.label)}" aria-label="Название">
-          <label class="unit"><input data-q="${q.id}" data-f="amount" type="number" inputmode="decimal" min="0" value="${q.amount}" aria-label="Сумма"><span>₽</span></label>
+          <label class="unit"><input data-q="${q.id}" data-f="amount" type="number" inputmode="decimal" min="0" value="${q.amount || ''}" placeholder="0" aria-label="Сумма"><span>₽</span></label>
           <label class="unit"><select data-q="${q.id}" data-f="cat" aria-label="Категория">${[...new Set([...allCats(), q.cat])].map(c => `<option ${c === q.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
           <button class="ghost" data-del-q="${q.id}" aria-label="Удалить">${ic('x')}</button></div>`).join('') || '<p class="empty">Пока нет. Добавь то, что покупаешь чаще всего.</p>'}</div>
         <button data-add="quick" style="align-self:flex-start">${ic('plus')}Добавить кнопку</button>
@@ -1431,9 +1441,9 @@ function renderProfile() {
     </div>
     <div class="stack">
       <div class="card">
-        <div><h2>${ic('file')}Импорт выписки</h2><p class="note" style="margin-top:4px">Выгрузи историю операций из банка в CSV и загрузи сюда. Списания станут тратами, повторы пропущу.</p></div>
-        ${csvRows ? csvPreview() : `<label class="btnlike" for="csvFile" style="align-self:flex-start">${ic('out')}Выбрать файл CSV</label>
-        <input id="csvFile" type="file" accept=".csv,text/csv,text/plain" hidden>`}
+        <div><h2>${ic('file')}Импорт выписки</h2><p class="note" style="margin-top:4px">Выгрузи историю операций из приложения банка и загрузи сюда: PDF, Excel, CSV, OFX или QIF. Списания станут тратами, повторы пропущу.</p></div>
+        ${csvRows ? csvPreview() : `<label class="btnlike" for="csvFile" style="align-self:flex-start">${ic('out')}Выбрать файл выписки</label>
+        <input id="csvFile" type="file" accept=".pdf,.xlsx,.xls,.csv,.txt,.ofx,.qif,application/pdf,text/csv,text/plain" hidden>`}
       </div>
       <div class="card">
         <h2>Резервная копия</h2>
@@ -1462,7 +1472,7 @@ function renderProfile() {
 }
 
 /* ---------- CSV import ---------- */
-function parseNum(s) { const v = String(s ?? '').replace(/[\s ₽$]/g, '').replace(/[−–]/g, '-').replace(',', '.'); return v === '' || isNaN(+v) ? null : +v; }
+function parseNum(s) { const v = String(s ?? '').replace(/[\s  ₽$€]|RUB|руб\.?|р\./gi, '').replace(/[−–]/g, '-').replace(',', '.'); return v === '' || isNaN(+v) ? null : +v; }
 function parseDateStr(s) {
   s = String(s || '').trim(); let m;
   if ((m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2,4})/))) { const y = +m[3] < 100 ? 2000 + +m[3] : +m[3]; return `${y}-${pad(+m[2])}-${pad(+m[1])}`; }
@@ -1479,22 +1489,115 @@ function splitCsv(line, sep) {
   out.push(cur); return out.map(x => x.trim());
 }
 function parseCsv(text) {
-  const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim());
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
-  const sep = (lines[0].match(/;/g) || []).length >= (lines[0].match(/,/g) || []).length ? ';' : ',';
-  const head = splitCsv(lines[0], sep).map(h => h.toLowerCase());
+  // Bank exports often start with a few lines of account details: find the table's header row.
+  let hi = lines.slice(0, 40).findIndex(l => /дата|date/i.test(l) && /сумм|amount/i.test(l)); if (hi < 0) hi = 0;
+  const hl = lines[hi], sep = (hl.match(/;/g) || []).length >= (hl.match(/,/g) || []).length ? ';' : ((hl.match(/\t/g) || []).length > (hl.match(/,/g) || []).length ? '\t' : ',');
+  const head = splitCsv(hl, sep).map(h => h.toLowerCase());
   const find = re => head.findIndex(h => re.test(h));
   let di = find(/дата операции|^дата|date/), ai = find(/сумма операции|^сумма|amount|сумма/), ti = find(/описание|назначение|description|получатель|merchant|категория/);
-  const rows = lines.slice(1).map(l => splitCsv(l, sep));
+  const rows = lines.slice(hi + 1).map(l => splitCsv(l, sep));
+  if (!rows.length) return [];
   if (di < 0) di = rows[0].findIndex(v => parseDateStr(v));
   if (ai < 0) ai = rows[0].findIndex((v, i) => i !== di && parseNum(v) !== null);
   if (di < 0 || ai < 0) return [];
-  let items = rows.map(r => ({ date: parseDateStr(r[di]), amount: parseNum(r[ai]), desc: ti >= 0 ? r[ti] : '' })).filter(r => r.date && r.amount);
+  return finishRows(rows.map(r => ({ date: parseDateStr(r[di]), amount: parseNum(r[ai]), plus: /^\s*\+/.test(r[ai] || ''), desc: ti >= 0 ? r[ti] : '' })));
+}
+// Signed amounts in, spends out: with minuses present, minus = spend; otherwise everything except explicit "+" is a spend.
+function finishRows(items) {
+  items = items.filter(r => r && r.date && r.amount);
   const hasNeg = items.some(r => r.amount < 0);
-  items = items.filter(r => hasNeg ? r.amount < 0 : true).map(r => ({ ...r, amount: Math.abs(r.amount) }));
-  const seen = new Set(S.spends.map(s => s.date + '|' + Math.round(s.amount)));
+  items = items.filter(r => hasNeg ? r.amount < 0 : !r.plus).map(r => ({ ...r, amount: Math.round(Math.abs(r.amount) * 100) / 100, desc: String(r.desc || '').replace(/\s+/g, ' ').trim().slice(0, 60) }));
+  const seen = new Set(S.spends.map(x => x.date + '|' + Math.round(x.amount)));
   return items.slice(0, 300).map(r => ({ ...r, id: uid(), on: !seen.has(r.date + '|' + Math.round(r.amount)), dup: seen.has(r.date + '|' + Math.round(r.amount)), cat: 'Другое' }));
 }
+function parseOfx(text) {
+  const out = [];
+  for (const m of text.matchAll(/<STMTTRN>([\s\S]*?)(?=<\/STMTTRN>|<STMTTRN>|<\/BANKTRANLIST>)/gi)) {
+    const g = k => ((m[1].match(new RegExp('<' + k + '>([^<\\r\\n]*)', 'i')) || [])[1] || '').trim();
+    const d = g('DTPOSTED');
+    out.push({ date: /^\d{8}/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : null, amount: parseNum(g('TRNAMT')), desc: g('NAME') || g('MEMO') });
+  }
+  return finishRows(out);
+}
+function parseQif(text) {
+  const out = []; let cur = {};
+  for (const raw of text.split(/\r?\n/)) {
+    const k = raw[0], v = raw.slice(1).trim();
+    if (k === 'D') cur.date = parseDateStr(v.replace(/'/g, '.').replace(/\//g, '.'));
+    else if (k === 'T' || k === 'U') cur.amount = parseNum(v);
+    else if (k === 'P' || (k === 'M' && !cur.desc)) cur.desc = v;
+    else if (k === '^') { out.push(cur); cur = {}; }
+  }
+  return finishRows(out);
+}
+// Turns text lines of a statement (from a PDF) into operations: a line with a date and a money amount.
+function linesToRows(lines) {
+  const AMT = /[+\-−–]?\s?\d{1,3}(?:[ \u00a0\u202f]\d{3})*[.,]\d{2}(?!\d)/g;
+  const out = [];
+  for (const l of lines) {
+    const dm = l.match(/\b(\d{2})[./](\d{2})[./](\d{4}|\d{2})\b/); if (!dm) continue;
+    const date = parseDateStr(dm[0]); if (!date) continue;
+    const rest = l.replace(/\b\d{2}[./]\d{2}[./](\d{4}|\d{2})\b/g, ' ').replace(/\b\d{1,2}:\d{2}(:\d{2})?\b/g, ' ');
+    const am = rest.match(AMT); if (!am) continue;
+    const raw = am[0];                                      // the first amount is the operation; later ones are usually the balance
+    out.push({ date, amount: parseNum(raw), plus: /^\s*\+/.test(raw), desc: rest.replace(AMT, ' ').replace(/[₽]|\bRUB\b|\bруб\.?/gi, ' ') });
+  }
+  return finishRows(out);
+}
+const LIBS = {
+  pdf: [['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', 'sha384-SnzOobpRMLXZ52iJvZm/C0fYw0OQemTXzTjIsdsfMcrCtCEe9qgzxTd3RSklO5x2'],
+        ['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e']],
+  xlsx: [['https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw']],
+};
+// Libraries load only when a file needs them, pinned by hash so a changed file on the CDN is refused.
+function loadLib(name) {
+  return LIBS[name].reduce((p, [src, sri]) => p.then(() => new Promise((res, rej) => {
+    if (document.querySelector(`script[data-lib="${src}"]`)) return res();
+    const el = document.createElement('script');
+    el.src = src; el.integrity = sri; el.crossOrigin = 'anonymous'; el.referrerPolicy = 'no-referrer'; el.dataset.lib = src;
+    el.onload = res; el.onerror = () => { el.remove(); rej(new Error('lib')); };
+    document.head.appendChild(el);
+  })), Promise.resolve());
+}
+async function pdfLines(buf) {
+  await loadLib('pdf');
+  const lib = window.pdfjsLib; lib.GlobalWorkerOptions.workerSrc = LIBS.pdf[0][0];
+  // isEvalSupported:false closes the known font-code execution hole in older pdf.js builds.
+  const doc = await lib.getDocument({ data: buf, isEvalSupported: false, disableFontFace: true, enableXfa: false }).promise;
+  const lines = [];
+  for (let p = 1; p <= Math.min(doc.numPages, 80); p++) {
+    const tc = await (await doc.getPage(p)).getTextContent(), rows = [];
+    for (const it of tc.items) {
+      if (!it.str || !it.str.trim()) continue;
+      const y = it.transform[5]; let r = rows.find(r => Math.abs(r.y - y) <= 3);
+      if (!r) rows.push(r = { y, items: [] }); r.items.push({ x: it.transform[4], s: it.str });
+    }
+    rows.sort((a, b) => b.y - a.y).forEach(r => lines.push(r.items.sort((a, b) => a.x - b.x).map(i => i.s).join(' ')));
+  }
+  try { doc.destroy(); } catch (e) {}
+  return lines;
+}
+async function xlsxText(buf) {
+  await loadLib('xlsx');
+  const wb = window.XLSX.read(buf, { type: 'array', cellDates: false, dense: true });
+  return wb.SheetNames.slice(0, 3).map(n => window.XLSX.utils.sheet_to_csv(wb.Sheets[n], { FS: ';', blankrows: false, dateNF: 'dd.mm.yyyy' })).join('\n');
+}
+function decodeText(buf) {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { return new TextDecoder('windows-1251').decode(buf); }
+}
+async function readStatement(file) {
+  const buf = new Uint8Array(await file.arrayBuffer()), name = file.name.toLowerCase();
+  const head = String.fromCharCode(...buf.slice(0, 8));
+  if (head.startsWith('%PDF') || name.endsWith('.pdf')) return linesToRows(await pdfLines(buf));
+  if (head.startsWith('PK') || buf[0] === 0xD0 && buf[1] === 0xCF || /\.xlsx?$/.test(name)) return parseCsv(await xlsxText(buf));
+  const text = decodeText(buf);
+  if (/<OFX>|<STMTTRN>/i.test(text) || name.endsWith('.ofx')) return parseOfx(text);
+  if (/^!Type:/im.test(text) || name.endsWith('.qif')) return parseQif(text);
+  return parseCsv(text);
+}
+
 function csvPreview() {
   const on = csvRows.filter(r => r.on);
   return `<div class="kv"><span>Найдено ${csvRows.length}, выбрано ${on.length} на ${rub(on.reduce((a, r) => a + r.amount, 0))}</span><button class="linkbtn" data-csv-cancel="1">Отмена</button></div>
@@ -1511,13 +1614,13 @@ function csvPreview() {
 }
 
 /* ---------- onboarding ---------- */
-const PRESETS = [['Связь', 0, 29], ['Подписка', 0, 1], ['Аренда', 0, 1], ['Коммуналка', 0, 10], ['Интернет', 0, 5]];
+const PRESETS = [['Аренда жилья', 0, 0], ['Ипотека', 0, 0], ['Коммунальные услуги', 0, 0], ['Мобильная связь', 0, 0], ['Домашний интернет', 0, 0], ['Подписки и сервисы', 0, 0], ['Проездной', 0, 0], ['Страховка', 0, 0], ['Кружки и секции', 0, 0], ['Алименты', 0, 0]];
 function onbSteps() { const sc = onb.scen || {}; return ['scen', 'balance', ...(sc.debt ? ['debt'] : []), ...(sc.save ? ['goal'] : []), 'pay', 'bills']; }
 function startOnb() {
   onb = clone(S); onbStep = 0;
   if (!onb.scen) onb.scen = { debt: true, save: false, irregular: false };
-  if (!onb.paydays?.length) onb.paydays = [1, 16];
-  if (onb.scen.debt && !onb.debts.length) onb.debts.push({ id: uid(), name: 'Кредитка', balance: 0, apr: 0, min: 0, day: 13, paid: [] });
+  if (onb.scen.debt && !onb.debts.length) onb.debts.push({ id: uid(), name: '', balance: 0, apr: 0, min: 0, day: 0, paid: [] });
+  if (!S.ratesAt) fetchRates(false);
   render();
 }
 function renderOnb() {
@@ -1531,31 +1634,35 @@ function renderOnb() {
       `<button class="opt" role="checkbox" aria-checked="${!!onb.scen[k]}" data-scen="${k}"><span class="rd"></span><span><b>${a}</b><span class="sub">${b}</span></span></button>`).join('')}</div>
     <p class="note">Дневной лимит до следующего дохода считается в любом случае.</p>`;
   if (cur === 'balance') body = head('Сколько денег на карте', 'От этого считается дневной лимит.') + `
-    <label class="f"><span>Сейчас на карте, ₽</span><input id="o-balance" type="number" inputmode="decimal" step="any" value="${onb.balance || ''}" placeholder="22000"></label>`;
-  if (cur === 'debt') body = head('Какие есть долги', 'Кредитки, кредиты, займы. Минималку считаю процентами: долг уменьшают только деньги сверху.') + `
+    <label class="f"><span>Сейчас на карте, ₽</span><input id="o-balance" type="number" inputmode="decimal" step="any" value="${onb.balance || ''}" placeholder="сколько показывает банк"></label>`;
+  if (cur === 'debt') body = head('Какие есть долги', 'Кредитки, кредиты, займы. Минимальный платёж считаю процентами банку: долг уменьшают только деньги, которые вносишь сверху.') + `
     <div class="card" style="padding:4px 14px">${onb.debts.map(d => `<div class="dcard">
-      <div class="kv"><input class="plain" data-debt="${d.id}" data-f="name" value="${esc(d.name)}" aria-label="Название" style="flex:1"><button class="ghost" data-del-debt="${d.id}" aria-label="Удалить">${ic('x')}</button></div>
+      <div class="kv"><input class="plain" data-debt="${d.id}" data-f="name" value="${esc(d.name)}" placeholder="Название долга" aria-label="Название долга" style="flex:1"><button class="ghost" data-del-debt="${d.id}" aria-label="Удалить">${ic('x')}</button></div>
       <div class="fgrid">
-        <label class="f"><span>Остаток, ₽</span><input data-debt="${d.id}" data-f="balance" type="number" inputmode="decimal" value="${d.balance || ''}" placeholder="350000"></label>
-        <label class="f"><span>Ставка, %</span><input data-debt="${d.id}" data-f="apr" type="number" inputmode="decimal" step="0.1" value="${d.apr || ''}" placeholder="0"></label>
-        <label class="f"><span>Минималка, ₽</span><input data-debt="${d.id}" data-f="min" type="number" inputmode="decimal" value="${d.min || ''}" placeholder="12000"></label>
-        <label class="f"><span>Число платежа</span><input data-debt="${d.id}" data-f="day" type="number" inputmode="numeric" min="1" max="31" value="${d.day}"></label>
+        <label class="f"><span>Сколько осталось, ₽</span><input data-debt="${d.id}" data-f="balance" type="number" inputmode="decimal" value="${d.balance || ''}" placeholder="сумма долга"></label>
+        <label class="f"><span>Ставка, % годовых</span><input data-debt="${d.id}" data-f="apr" type="number" inputmode="decimal" step="0.1" value="${d.apr || ''}" placeholder="если знаешь"></label>
+        <label class="f"><span>Мин. платёж в месяц, ₽</span><input data-debt="${d.id}" data-f="min" type="number" inputmode="decimal" value="${d.min || ''}" placeholder="сумма"></label>
+        <label class="f"><span>Дата платежа</span>${dueInput('data-debt', d.id, d.day, 'Дата платежа')}</label>
       </div></div>`).join('') || '<p class="empty" style="padding:10px 0">Долгов нет.</p>'}</div>
     <button type="button" data-add="debt" style="align-self:flex-start">${ic('plus')}Ещё долг</button>`;
   if (cur === 'goal') body = head('На что копишь', 'Сумма цели делится на 100 клеток, они закрашиваются по мере накопления.') + `
     <div class="card" style="padding:4px 14px">${onb.goals.map(g => `<div class="dcard">
-      <div class="kv"><input class="plain" data-goal="${g.id}" data-f="name" value="${esc(g.name)}" aria-label="Название цели" style="flex:1"></div>
+      <div class="kv"><input class="plain" data-goal="${g.id}" data-f="name" value="${esc(g.name === 'Моя цель' ? '' : g.name)}" placeholder="Название цели" aria-label="Название цели" style="flex:1"></div>
       <div class="fgrid">
-        <label class="f"><span>Сколько нужно, ₽</span><input data-goal="${g.id}" data-f="target" type="number" inputmode="decimal" value="${g.target || ''}" placeholder="50000"></label>
-        <label class="f"><span>План в месяц, ₽</span><input data-goal="${g.id}" data-f="monthly" type="number" inputmode="decimal" value="${g.monthly || ''}" placeholder="5000"></label>
+        <label class="f"><span>Сколько нужно, ₽</span><input data-goal="${g.id}" data-f="target" type="number" inputmode="decimal" value="${g.target || ''}" placeholder="сумма цели"></label>
+        <label class="f"><span>План в месяц, ₽</span><input data-goal="${g.id}" data-f="monthly" type="number" inputmode="decimal" value="${g.monthly || ''}" placeholder="сколько откладывать"></label>
       </div></div>`).join('')}</div>
     <button type="button" data-add="goal" style="align-self:flex-start">${ic('plus')}Ещё цель</button>`;
   if (cur === 'pay') body = head('Когда приходят деньги', 'До этой даты считается дневной лимит.') + `
     <div class="fgrid">${payFields(onb)}</div>
-    <label class="f"><span>Курс доллара, если платят в $ или крипте</span><input id="o-rate" type="number" inputmode="decimal" step="0.01" value="${onb.usdRate || ''}" placeholder="80"></label>`;
-  if (cur === 'bills') body = head('Обязательные платежи', 'То, что уходит каждый месяц, что бы ни случилось. Минималки по долгам уже учтены.') + `
+    <div><span class="label">Курсы валют</span><p class="note" style="margin-top:4px">Нужны, если доход приходит в долларах, евро или криптовалюте. Подтягиваются по курсу ЦБ, их можно поправить.</p></div>
+    <div class="two">
+      <label class="f"><span>Доллар, ₽</span><input id="o-rate" type="number" inputmode="decimal" step="0.01" value="${onb.ratesAt ? onb.usdRate : ''}" placeholder="курс $"></label>
+      <label class="f"><span>Евро, ₽</span><input id="o-eur" type="number" inputmode="decimal" step="0.01" value="${onb.ratesAt ? onb.eurRate : ''}" placeholder="курс €"></label>
+    </div>`;
+  if (cur === 'bills') body = head('Обязательные платежи', 'То, что уходит каждый месяц, что бы ни случилось. Выбери подходящие и укажи сумму и дату. Платежи по долгам уже учтены.') + `
     <div class="presets">${PRESETS.filter(p => !onb.bills.some(b => b.name === p[0])).map(p => `<button type="button" class="chip" data-preset="${p[0]}">${ic('plus')}${p[0]}</button>`).join('')}</div>
-    <div class="card" style="padding:6px 14px">${onb.bills.map(billRow).join('') || '<p class="empty" style="padding:10px 0">Нажми на подсказку выше или добавь свой платёж.</p>'}</div>
+    <div class="card" style="padding:6px 14px">${onb.bills.map(billRow).join('') || '<p class="empty" style="padding:10px 0">Нажми на подсказку выше или добавь свой платёж. Можно пропустить и добавить позже.</p>'}</div>
     <button type="button" data-add="bill" style="align-self:flex-start">${ic('plus')}Свой платёж</button>`;
   $('v-onb').innerHTML = `<div class="onb">${steps}${body}
     <div class="nav">
@@ -1564,9 +1671,10 @@ function renderOnb() {
     </div></div>`;
 }
 function readOnb() {
-  const b = $('o-balance'), r = $('o-rate');
+  const b = $('o-balance'), r = $('o-rate'), eu = $('o-eur');
   if (b) onb.balance = +b.value || 0;
-  if (r) onb.usdRate = +r.value || 80;
+  if (r && +r.value > 0 && +r.value !== +onb.usdRate) { onb.usdRate = +r.value; onb.ratesAt = ymd(today0()); onb.ratesAuto = false; }
+  if (eu && +eu.value > 0 && +eu.value !== +onb.eurRate) { onb.eurRate = +eu.value; onb.ratesAt = ymd(today0()); onb.ratesAuto = false; }
 }
 const parsePaydays = s => [...new Set(String(s).split(/[^\d]+/).map(Number).filter(n => n >= 1 && n <= 31))].sort((a,b)=>a-b);
 
@@ -1604,7 +1712,7 @@ function checkCele() {
     show = m === 100 ? { m, icon: 'trophy', label: 'Цель достигнута', title: g.name, text: `Накоплено ${rub(p.saved)}. Все 100 клеток закрашены.` }
       : { m, icon: 'flag', label: `${m}% цели`, title: g.name, text: `Накоплено ${rub(p.saved)} из ${rub(p.target)}. Осталось ${rub(p.left)}.` }; } }
   if (now.debt > (was.debt || 0)) { const p = progress(), m = now.debt;
-    show = m === 100 ? (p.total <= 0 ? { m, icon: 'trophy', label: 'Долг закрыт', title: 'Ты это сделал', text: `${rub(p.start)} позади. Больше никаких минималок.` }
+    show = m === 100 ? (p.total <= 0 ? { m, icon: 'trophy', label: 'Долг закрыт', title: 'Ты это сделал', text: `${rub(p.start)} позади. Больше никаких минимальных платежей.` }
         : { m, icon: 'trophy', label: 'Хватает на весь долг', title: 'Осталось перевести', text: `В копилке ${rub(p.pot)} — этого хватает, чтобы закрыть долг целиком.` })
       : { m, icon: 'flag', label: `${m}% долга`, title: m === 25 ? 'Четверть пути' : m === 50 ? 'Половина позади' : 'Три четверти', text: `Закрыто и отложено ${rub(p.start - p.left)} из ${rub(p.start)}. Осталось ${rub(p.left)}.` }; }
   if (show) showCele(show);
@@ -1685,6 +1793,15 @@ function unpay(t, id, key) {
   if (t === 'one') { const o = S.oneoffs.find(x => x.id === id); if (o) o.paid = false; return; }
   const it = (t === 'bill' ? S.bills : S.debts).find(x => x.id === id); if (it) it.paid = (it.paid || []).filter(k => k !== key);
 }
+// A monthly payment is stored as a day of the month; the form shows the next date it falls on.
+function nextDue(day) {
+  if (!(+day >= 1)) return '';
+  const t = today0(); let y = t.getFullYear(), m = t.getMonth();
+  let d = new Date(y, m, Math.min(day, dim(y, m)));
+  if (d < t) { m++; d = new Date(y, m, Math.min(day, dim(new Date(y, m, 1).getFullYear(), new Date(y, m, 1).getMonth()))); }
+  return ymd(d);
+}
+const dueInput = (attr, id, day, label) => `<input ${attr}="${id}" data-f="day" data-date="1" type="date" value="${nextDue(day)}" aria-label="${label}">`;
 function addSpend(amount, cat, date, note) {
   const sp = { id: uid(), date, amount, cat, ...(note ? { note } : {}) };
   S.spends.push(sp); if (S.spends.length > 1500) S.spends = S.spends.slice(-1500);
@@ -1731,7 +1848,7 @@ document.addEventListener('submit', e => {
     if (!(earned > 0)) return;
     const gid = $('inGoal') ? $('inGoal').value : '';
     S.entries.push({ id: uid(), date: $('inDate').value, kind: incKind, cur: incCur, earned, saved, free, rate: incCur === 'RUB' ? 0 : rateOf(incCur), ...(gid && saved > 0 ? { goalId: gid } : {}) });
-    S.balance += toRub(free, incCur); $('inEarn').value = ''; $('inSave').value = '0'; commit(`${KINDS[incKind]}: на карту ${money(free, incCur)}, отложено ${money(saved, incCur)}`);
+    S.balance += toRub(free, incCur); $('inEarn').value = ''; $('inSave').value = ''; commit(`${KINDS[incKind]}: на карту ${money(free, incCur)}, отложено ${money(saved, incCur)}`);
   }
   if (f.id === 'goalDep') {
     const g = S.goals.find(x => x.id === f.dataset.id), a = +$('gdAmt').value || 0; if (!g || !(a > 0)) return;
@@ -1796,8 +1913,8 @@ document.addEventListener('click', e => {
   if (d.scen) {
     onb.scen[d.scen] = !onb.scen[d.scen];
     if (d.scen === 'irregular') onb.payMode = onb.scen.irregular ? 'manual' : 'days';
-    if (onb.scen.debt && !onb.debts.length) onb.debts.push({ id: uid(), name: 'Кредитка', balance: 0, apr: 0, min: 0, day: 13, paid: [] });
-    if (onb.scen.save && !onb.goals.length) onb.goals.push({ id: uid(), name: 'Моя цель', target: 0, monthly: 0, extra: 0 });
+    if (onb.scen.debt && !onb.debts.length) onb.debts.push({ id: uid(), name: '', balance: 0, apr: 0, min: 0, day: 0, paid: [] });
+    if (onb.scen.save && !onb.goals.length) onb.goals.push({ id: uid(), name: '', target: 0, monthly: 0, extra: 0 });
     render(); return;
   }
   if (d.goalOut) {
@@ -1881,7 +1998,16 @@ document.addEventListener('click', e => {
   if (d.onbStep) {
     readOnb();
     if (+d.onbStep < 0) { onbStep--; render(); return; }
+    if (onbSteps()[onbStep] === 'pay') {
+      const pm = onb.payMode || 'days';
+      const el = document.querySelector('[data-pay="paydays"]'); if (el && pm === 'days') onb.paydays = parsePaydays(el.value);
+      if (pm === 'days' && !(onb.paydays || []).length) { toast('Укажи, каким числом приходит зарплата'); return; }
+      if (pm === 'biweekly' && !onb.payAnchor) { toast('Укажи дату любой из зарплат'); return; }
+      if (pm === 'manual' && !onb.payNext) { toast('Укажи, когда ждёшь следующий доход'); return; }
+    }
     if (onbStep < onbSteps().length - 1) { onbStep++; render(); return; }
+    onb.debts.forEach((d, i) => { if (!String(d.name).trim()) d.name = onb.debts.length > 1 ? `Долг ${i + 1}` : 'Долг'; });
+    onb.goals.forEach((g, i) => { if (!String(g.name).trim() || g.name === 'Моя цель') g.name = onb.goals.length > 1 ? `Цель ${i + 1}` : 'Цель'; });
     const wasStart = +S.debtStart || 0;
     S = migrate(Object.assign(onb, { onboarded: true }));
     const tot = totalDebt(); if (!wasStart || tot > wasStart) S.debtStart = tot + (+S.potUsed || 0);
@@ -1895,6 +2021,8 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('cele').hidden) { $('cele').hidden = true; return; } const c = e.target.closest?.('.card.link'); if (c && (e.key === 'Enter' || e.key === ' ') && e.target === c) { e.preventDefault(); if (c.dataset.goal) { goalTab = c.dataset.goal; renderDebt(); } go(c.dataset.go); } });
+// Tapping a filled number field selects it, so typing replaces the value instead of appending to it.
+document.addEventListener('focusin', e => { const t = e.target; if (t && t.tagName === 'INPUT' && t.type === 'number' && t.value !== '') setTimeout(() => { try { t.select(); } catch (x) {} }, 0); });
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'inEarn' || t.id === 'inSave') updFree();
@@ -1911,6 +2039,12 @@ document.addEventListener('change', e => {
   const t = e.target, T = onb || S;
   if (t.id === 'whatIfNum') { whatIf = Math.max(0, Math.min(1e7, Math.round(+t.value || 0))); const y = scrollY; renderDebt(); scrollTo(0, y); return; }
   if (t.id === 'whatIf') { const y = scrollY; renderDebt(); scrollTo(0, y); const r = $('whatIf'); if (r) r.focus(); return; }
+  if (t.dataset.date) {
+    const dd = t.value ? parse(t.value) : null, dayv = dd && !isNaN(dd) ? dd.getDate() : 0;
+    const list = t.dataset.bill ? T.bills : t.dataset.debt ? T.debts : null, x = list && list.find(b => b.id === (t.dataset.bill || t.dataset.debt));
+    if (x) { x.day = dayv; if (onb) render(); else commit(dayv ? `Платёж каждое ${dayv}-е число` : undefined); }
+    return;
+  }
   const num = isFinite(+t.value) ? +t.value : 0;
   const val = t.type === 'number' ? (t.dataset.set === 'balance' ? num : Math.min(1e12, Math.max(0, num))) : String(t.value).slice(0, 60);
   if (t.dataset.bill) { const x = T.bills.find(b => b.id === t.dataset.bill); if (x) { x[t.dataset.f] = t.dataset.f === 'day' ? Math.min(31, Math.max(1, Math.round(val) || 1)) : val; if (!onb) commit(); } }
@@ -1925,6 +2059,7 @@ document.addEventListener('change', e => {
   if (t.dataset.goal) { const x = T.goals.find(b => b.id === t.dataset.goal); if (x) { x[t.dataset.f] = t.dataset.f === 'name' ? (String(val).trim() || 'Цель') : val; if (!onb) commit(); } }
   if (t.dataset.pay) {
     const k = t.dataset.pay; if (onb) readOnb();
+    if (k === 'paydays' && !parsePaydays(t.value).length) { toast('Укажи хотя бы одно число месяца, например 1 или 10, 25'); t.value = (T.paydays || []).join(', '); return; }
     T[k] = k === 'paydays' ? parsePaydays(t.value) : k === 'payWeekday' ? +t.value : t.value;
     if (T.payMode === 'manual') T.skip = 0;
     if (onb) render(); else commit('Сохранено');
@@ -1939,15 +2074,13 @@ document.addEventListener('change', e => {
   if (t.dataset.csvCat) { const r = csvRows.find(x => x.id === t.dataset.csvCat); if (r) r.cat = t.value; }
   if (t.id === 'csvDeduct') csvDeduct = t.checked;
   if (t.id === 'csvFile' && t.files?.[0]) {
-    const file = t.files[0], r = new FileReader();
-    if (file.size > 2e6) { toast('Файл больше 2 МБ, выгрузи выписку за меньший период'); return; }
-    r.onload = () => {
-      let text = String(r.result);
-      if (text.includes(String.fromCharCode(0xFFFD))) { const r2 = new FileReader(); r2.onload = () => done(String(r2.result)); r2.readAsText(file, 'windows-1251'); return; }
-      done(text);
-    };
-    const done = text => { const rows = parseCsv(text); if (!rows.length) { toast('Не нашёл в файле даты и суммы'); return; } csvRows = rows; renderProfile(); };
-    r.readAsText(file);
+    const file = t.files[0]; t.value = '';
+    if (file.size > 15e6) { toast('Файл больше 15 МБ, выгрузи выписку за меньший период'); return; }
+    toast('Читаю выписку…');
+    readStatement(file).then(rows => {
+      if (!rows.length) { toast('Не нашёл в файле операций с датой и суммой'); return; }
+      csvRows = rows; renderProfile(); toast(`Нашёл ${rows.length} ${plural(rows.length, 'операцию', 'операции', 'операций')}, проверь список`);
+    }).catch(err => toast(err && err.message === 'lib' ? 'Не удалось загрузить модуль для этого формата. Попробуй CSV' : 'Не получилось прочитать файл. Попробуй другой формат выгрузки'));
   }
   if (t.id === 'importFile' && t.files?.[0]) {
     if (t.files[0].size > 2e6) { toast('Файл слишком большой для копии этого приложения'); return; }
@@ -1972,6 +2105,7 @@ async function fetchRates(manual) {
     const j = await r.json(), u = +j.Valute.USD.Value, e = +j.Valute.EUR.Value;
     if (!(u > 0 && u < 1e5 && e > 0 && e < 1e5)) throw new Error('bad rates');
     S.usdRate = Math.round(u * 100) / 100; S.eurRate = Math.round(e * 100) / 100; S.ratesAt = ymd(today0()); S.ratesAuto = true; rateFail = false;
+    if (onb && !(onb.ratesAt && !onb.ratesAuto)) Object.assign(onb, { usdRate: S.usdRate, eurRate: S.eurRate, ratesAt: S.ratesAt, ratesAuto: true });
     commit(manual ? `Курсы обновлены: $ ${S.usdRate}, € ${S.eurRate}` : undefined);
   } catch (err) {
     rateFail = true;
@@ -1999,8 +2133,29 @@ function goLocal(text) {
 }
 async function tgBoot() {
   try { TG.ready(); TG.expand(); } catch (e) {}
-  const theme = () => { try { document.documentElement.setAttribute('data-theme', TG.colorScheme === 'light' ? 'light' : 'dark'); } catch (e) {} };
+  const v = x => { try { return TG.isVersionAtLeast(x); } catch (e) { return false; } };
+  const hex = c => { const m = String(c).match(/\d+/g); return m && m.length >= 3 ? '#' + m.slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('') : null; };
+  // Paint Telegram's own bars in the app's background so no strip of another colour remains.
+  const colors = () => { try {
+    const bg = hex(getComputedStyle(document.body).backgroundColor), bar = hex(getComputedStyle($('tabbar')).backgroundColor) || bg;
+    if (!bg) return;
+    try { if (v('6.1')) { TG.setHeaderColor(bg); TG.setBackgroundColor(bg); } } catch (e) {}
+    try { if (v('7.10')) TG.setBottomBarColor(window.matchMedia('(max-width:760px)').matches ? bar : bg); } catch (e) {}
+  } catch (e) {} };
+  const theme = () => { try { document.documentElement.setAttribute('data-theme', TG.colorScheme === 'light' ? 'light' : 'dark'); } catch (e) {} colors(); };
   theme(); try { TG.onEvent('themeChanged', theme); } catch (e) {}
+  // Telegram reports its own insets (status bar, close/menu buttons); the page keeps clear of them.
+  const insets = () => { try {
+    const s = TG.safeAreaInset || {}, c = TG.contentSafeAreaInset || {}, r = document.documentElement.style;
+    r.setProperty('--sat', ((+s.top || 0) + (+c.top || 0)) + 'px');
+    r.setProperty('--sab', ((+s.bottom || 0) + (+c.bottom || 0)) + 'px');
+  } catch (e) {} };
+  for (const ev of ['safeAreaChanged', 'contentSafeAreaChanged', 'fullscreenChanged', 'viewportChanged']) try { TG.onEvent(ev, insets); } catch (e) {}
+  if (/^(android|ios)$/.test(TG.platform || '') && v('8.0')) {
+    try { TG.requestFullscreen(); } catch (e) {}
+    try { if (v('7.7')) TG.disableVerticalSwipes(); } catch (e) {}
+  }
+  insets();
   const u = (TG.initDataUnsafe && TG.initDataUnsafe.user) || {};
   me = { name: cleanName([u.first_name, u.last_name].filter(Boolean).join(' ')), avatarUrl: safeImg(u.photo_url),
     handle: /^[A-Za-z0-9_]{3,32}$/.test(String(u.username || '')) ? String(u.username) : '' };
