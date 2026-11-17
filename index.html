@@ -248,7 +248,10 @@ svg.chart text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
 .cmp .d{font-size:12px}
 
 form{margin:0}
-.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.fgrid .f>span{flex:1}
+.fgrid input{height:42.5px}
+.dcard .opt.io{margin-top:10px;width:100%}
 .f{display:flex;flex-direction:column;gap:5px;min-width:0}
 .f>span{font-size:12px;color:var(--muted)}
 input,select{font:inherit;font-size:15px;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:0;width:100%}
@@ -550,7 +553,7 @@ function sanitize(s) {
   const lm = {}; for (const k of Object.keys(s.limits || {}).sort().slice(-70)) if (sdate(k)) lm[k] = snum(s.limits[k]); s.limits = lm;
   const paid = a => (Array.isArray(a) ? a : []).filter(x => /^\d{4}-\d{2}$/.test(String(x))).slice(-24);
   const day = v => { const n = Math.round(+v); return n >= 1 && n <= 31 ? n : 0; };   // 0 = date not set yet
-  s.debts = sarr(s.debts, 20).map(d => ({ id: sid(d.id), name: sstr(d.name, 40), balance: snum(d.balance), apr: snum(d.apr, 0, 1000), min: snum(d.min), day: day(d.day), paid: paid(d.paid) }));
+  s.debts = sarr(s.debts, 20).map(d => ({ id: sid(d.id), name: sstr(d.name, 40), balance: snum(d.balance), apr: snum(d.apr, 0, 1000), min: snum(d.min), day: day(d.day), paid: paid(d.paid), io: d.io === undefined ? !(+d.apr > 0) && +d.min > 0 : !!d.io }));
   s.goals = sarr(s.goals, 20).map(g => ({ id: sid(g.id), name: sstr(g.name, 30) || 'Цель', target: snum(g.target), monthly: snum(g.monthly), extra: snum(g.extra, -1e12) }));
   s.bills = sarr(s.bills, 60).map(b => ({ id: sid(b.id), name: sstr(b.name, 40), amount: snum(b.amount), day: day(b.day), paid: paid(b.paid) }));
   s.habits = sarr(s.habits, 30).map(h => ({ id: sid(h.id), name: sstr(h.name, 24), amount: snum(h.amount), every: snum(h.every, 0.5, 365) || 1 }));
@@ -737,10 +740,10 @@ function monthlySave() {
   const auto = avg * ppm;
   return { auto, save: +S.planMonthly > 0 ? +S.planMonthly : auto, n: vals.length, lo: vals.length ? Math.min(...vals) * ppm : 0 };
 }
-// Minimum payments cover interest (with no rate given, interest is assumed equal to the minimum).
+// Interest comes from the rate; a debt marked "interest only" without a rate charges exactly its minimum.
 // Only savings reduce principal; a closed debt's minimum rolls over to the next one.
 function simulate(extra, applyPot = true) {
-  const ds = S.debts.map(d => ({ id: d.id, name: d.name, bal: Math.max(0, +d.balance || 0), r: (+d.apr || 0) / 1200, min: +d.min || 0, apr: +d.apr || 0 })).filter(d => d.bal > 0);
+  const ds = S.debts.map(d => ({ id: d.id, name: d.name, bal: Math.max(0, +d.balance || 0), r: (+d.apr || 0) / 1200, min: +d.min || 0, apr: +d.apr || 0, io: !!d.io })).filter(d => d.bal > 0);
   const order = () => priorityOrder(ds.filter(d => d.bal > 0).map(d => ({ ...d, balance: d.bal })));
   let pot = applyPot ? potInfo().pot : 0;
   for (const o of order()) { const d = ds.find(x => x.id === o.id); const p = Math.min(pot, d.bal); d.bal -= p; pot -= p; }
@@ -751,7 +754,7 @@ function simulate(extra, applyPot = true) {
     let pool = extra;
     for (const d of ds) {
       if (d.bal <= 0) { pool += d.min; continue; }
-      const interest = d.r > 0 ? d.bal * d.r : d.min;
+      const interest = d.r > 0 ? d.bal * d.r : d.io ? d.min : 0;
       interestTotal += interest; d.bal += interest;
       const pay = Math.min(d.bal, d.min); d.bal -= pay; pool += d.min - pay;
     }
@@ -1259,12 +1262,12 @@ function renderDebtBody() {
           <div><span class="label">Срок</span><span class="v num">${isFinite(base.months) ? base.months + ' мес.' : 'никогда'}</span></div>
           <div><span class="label">Переплата</span><span class="v num neg">${isFinite(base.months) ? rub(base.interest) : '—'}</span></div>
         </div>
-        ${isFinite(base.months) && base.interest > 0 && !S.debts.some(d => +d.apr > 0) ? `<p class="note">Переплата — деньги, которые уйдут банку сверх самого долга. Ставка не указана, поэтому считаю, что мин. платёж каждый месяц целиком уходит на проценты: ${rub(S.debts.reduce((a, d) => a + (+d.min || 0), 0))} × ${monW(base.months)}. Укажи ставку в «Моих долгах», и расчёт станет точнее.</p>` : ''}
+        ${isFinite(base.months) && base.interest > 0 && S.debts.some(d => d.io && !(+d.apr > 0)) && !S.debts.some(d => +d.apr > 0) ? `<p class="note">Переплата — деньги, которые уйдут банку сверх самого долга. У долга отмечено, что мин. платёж целиком уходит на проценты: ${rub(S.debts.reduce((a, d) => a + (+d.min || 0), 0))} × ${monW(base.months)}. Укажи ставку в «Моих долгах», и расчёт станет точнее.</p>` : ''}
         <div id="chartBox">${chart(base, wi, t)}</div>
         <div class="rows">
           <div class="row"><span>Откладываю в месяц <span class="tag">${+S.planMonthly > 0 ? 'мой план' : ms.n ? `оценка по ${ms.n} ${plural(ms.n, 'зарплате', 'зарплатам', 'зарплатам')}` : 'плана нет'}</span></span><span class="num">${rub(ms.save)}</span></div>
           ${!(+S.planMonthly > 0) && ms.n >= 2 && ms.lo < ms.save ? `<div class="row"><span>Если каждый раз как в худшую зарплату <span class="tag">${rub(ms.lo)} в месяц</span></span><span class="num muted">${(m => isFinite(m) ? m + ' мес.' : 'не закроется')(simulate(ms.lo).months)}</span></div>` : ''}
-          <div class="row"><span>${S.debts.filter(d => +d.min > 0).length > 1 ? 'Мин. платежи' : 'Мин. платёж'} в месяц <span class="tag">уходит на проценты</span></span><span class="num">${rub(S.debts.reduce((a, d) => a + (+d.min || 0), 0))}</span></div>
+          <div class="row"><span>${S.debts.filter(d => +d.min > 0).length > 1 ? 'Мин. платежи' : 'Мин. платёж'} в месяц <span class="tag">${S.debts.some(d => d.io && !(+d.apr > 0)) ? 'уходит на проценты' : 'гасит долг'}</span></span><span class="num">${rub(S.debts.reduce((a, d) => a + (+d.min || 0), 0))}</span></div>
           ${isFinite(base.months) && base.interest > 0 ? `<div class="row"><span>Откуда переплата <span class="tag">${S.debts.some(d => +d.apr > 0) ? 'проценты по ставке, пока долг гасится' : `мин. платёж × ${monW(base.months)}`}</span></span><span class="num neg">${rub(base.interest)}</span></div>` : ''}
           <div class="row"><span>Если платить только мин. платёж</span><span class="num muted">${isFinite(minOnly.months) ? minOnly.months + ' мес.' : 'не закроется'}</span></div>
           ${base.closes.length > 1 ? base.closes.map(cl => `<div class="row"><span>${esc(cl.name)} закроется</span><span class="num">${cl.m === 0 ? 'сразу' : monthName(t, cl.m)}</span></div>`).join('') : ''}
@@ -1295,7 +1298,8 @@ function renderDebtBody() {
             <label class="f"><span>Ставка, % годовых</span><input data-debt="${d.id}" data-f="apr" type="number" inputmode="decimal" min="0" step="0.1" value="${d.apr || ''}" placeholder="если знаешь"></label>
             <label class="f"><span>Мин. платёж в месяц, ₽</span><input data-debt="${d.id}" data-f="min" type="number" inputmode="decimal" min="0" value="${d.min || ''}" placeholder="0"></label>
             <label class="f"><span>Дата платежа</span>${dueInput('data-debt', d.id, d.day, 'Дата платежа').replace('<input ', `<input class="${+d.min > 0 && !(+d.day >= 1) ? 'need' : ''}" `)}</label>
-          </div></div>`).join('') || '<p class="empty">Долгов нет. Добавь, чтобы следить за погашением.</p>'}</div>
+          </div>
+          ${+d.apr > 0 ? '' : `<button class="opt io" role="checkbox" aria-checked="${!!d.io}" data-io="${d.id}"><span class="rd"></span><span><b>Мин. платёж уходит только на проценты</b><span class="sub">Долг уменьшается лишь на то, что вносишь сверх него</span></span></button>`}</div>`).join('') || '<p class="empty">Долгов нет. Добавь, чтобы следить за погашением.</p>'}</div>
         <button data-add="debt" style="align-self:flex-start">${ic('plus')}Добавить долг</button>
       </div>
       <div class="card">
@@ -1618,8 +1622,8 @@ const PRESETS = [['Аренда жилья', 0, 0], ['Ипотека', 0, 0], ['
 function onbSteps() { const sc = onb.scen || {}; return ['scen', 'balance', ...(sc.debt ? ['debt'] : []), ...(sc.save ? ['goal'] : []), 'pay', 'bills']; }
 function startOnb() {
   onb = clone(S); onbStep = 0;
-  if (!onb.scen) onb.scen = { debt: true, save: false, irregular: false };
-  if (onb.scen.debt && !onb.debts.length) onb.debts.push({ id: uid(), name: '', balance: 0, apr: 0, min: 0, day: 0, paid: [] });
+  if (!onb.scen) onb.scen = { debt: false, save: false, irregular: false };
+  if (onb.scen.debt && !onb.debts.length) onb.debts.push({ id: uid(), name: '', balance: 0, apr: 0, min: 0, day: 0, paid: [], io: false });
   if (!S.ratesAt) fetchRates(false);
   render();
 }
@@ -1635,11 +1639,11 @@ function renderOnb() {
     <p class="note">Дневной лимит до следующего дохода считается в любом случае.</p>`;
   if (cur === 'balance') body = head('Сколько денег на карте', 'От этого считается дневной лимит.') + `
     <label class="f"><span>Сейчас на карте, ₽</span><input id="o-balance" type="number" inputmode="decimal" step="any" value="${onb.balance || ''}" placeholder="сколько показывает банк"></label>`;
-  if (cur === 'debt') body = head('Какие есть долги', 'Кредитки, кредиты, займы. Минимальный платёж считаю процентами банку: долг уменьшают только деньги, которые вносишь сверху.') + `
+  if (cur === 'debt') body = head('Какие есть долги', 'Кредитки, кредиты, займы. Ставку можно не указывать, если не знаешь.') + `
     <div class="card" style="padding:4px 14px">${onb.debts.map(d => `<div class="dcard">
       <div class="kv"><input class="plain" data-debt="${d.id}" data-f="name" value="${esc(d.name)}" placeholder="Название долга" aria-label="Название долга" style="flex:1"><button class="ghost" data-del-debt="${d.id}" aria-label="Удалить">${ic('x')}</button></div>
       <div class="fgrid">
-        <label class="f"><span>Сколько осталось, ₽</span><input data-debt="${d.id}" data-f="balance" type="number" inputmode="decimal" value="${d.balance || ''}" placeholder="сумма долга"></label>
+        <label class="f"><span>Сколько осталось, ₽</span><input data-debt="${d.id}" data-f="balance" type="number" inputmode="decimal" value="${d.balance || ''}" placeholder="сумма"></label>
         <label class="f"><span>Ставка, % годовых</span><input data-debt="${d.id}" data-f="apr" type="number" inputmode="decimal" step="0.1" value="${d.apr || ''}" placeholder="если знаешь"></label>
         <label class="f"><span>Мин. платёж в месяц, ₽</span><input data-debt="${d.id}" data-f="min" type="number" inputmode="decimal" value="${d.min || ''}" placeholder="сумма"></label>
         <label class="f"><span>Дата платежа</span>${dueInput('data-debt', d.id, d.day, 'Дата платежа')}</label>
@@ -1916,10 +1920,11 @@ document.addEventListener('click', e => {
   if (d.rates) { fetchRates(true); return; }
   if (d.wi) { whatIf = whatIf === +d.wi ? 0 : +d.wi; const y = scrollY; renderDebt(); scrollTo(0, y); return; }
   if (d.wiApply) { S.planMonthly = Math.round(monthlySave().save + whatIf); whatIf = 0; commit(`План обновлён: ${rub(S.planMonthly)} в месяц`); return; }
+  if (d.io) { const x = S.debts.find(z => z.id === d.io); if (x) { x.io = !x.io; commit(x.io ? 'Считаю мин. платёж процентами' : 'Мин. платёж гасит долг'); } return; }
   if (d.scen) {
     onb.scen[d.scen] = !onb.scen[d.scen];
     if (d.scen === 'irregular') onb.payMode = onb.scen.irregular ? 'manual' : 'days';
-    if (onb.scen.debt && !onb.debts.length) onb.debts.push({ id: uid(), name: '', balance: 0, apr: 0, min: 0, day: 0, paid: [] });
+    if (onb.scen.debt && !onb.debts.length) onb.debts.push({ id: uid(), name: '', balance: 0, apr: 0, min: 0, day: 0, paid: [], io: false });
     if (onb.scen.save && !onb.goals.length) onb.goals.push({ id: uid(), name: '', target: 0, monthly: 0, extra: 0 });
     render(); return;
   }
@@ -1985,7 +1990,7 @@ document.addEventListener('click', e => {
   if (d.delQ) { undoable('Кнопка удалена', () => S.quick = S.quick.filter(x => x.id !== d.delQ)); return; }
   if (d.delCat) { undoable(`Категория «${d.delCat}» убрана`, () => { S.cats = S.cats.filter(x => x !== d.delCat); delete S.catLimits[d.delCat]; }); return; }
   if (d.add === 'bill') { T.bills.push({ id: uid(), name: 'Новый платёж', amount: 0, day: 1, paid: [] }); onb ? render() : commit(); return; }
-  if (d.add === 'debt') { T.debts.push({ id: uid(), name: 'Новый долг', balance: 0, apr: 0, min: 0, day: 1, paid: [] }); if (onb) render(); else { goalTab = 'debt'; commit(); } return; }
+  if (d.add === 'debt') { T.debts.push({ id: uid(), name: onb ? '' : 'Новый долг', balance: 0, apr: 0, min: 0, day: 0, paid: [], io: false }); if (onb) render(); else { goalTab = 'debt'; commit(); } return; }
   if (d.add === 'habit') { S.habits.push({ id: uid(), name: 'Новое', amount: 0, every: 1 }); commit(); return; }
   if (d.add === 'one') { S.oneoffs.push({ id: uid(), name: 'Новая трата', amount: 0, date: ymd(addDays(today0(), 7)), paid: false }); commit(); return; }
   if (d.add === 'quick') { S.quick.push({ id: uid(), label: 'Обед', amount: 250, cat: allCats()[0] || 'Другое' }); commit(); return; }
@@ -2012,6 +2017,9 @@ document.addEventListener('click', e => {
       if (pm === 'manual' && !onb.payNext) { toast('Укажи, когда ждёшь следующий доход'); return; }
     }
     if (onbStep < onbSteps().length - 1) { onbStep++; render(); return; }
+    // Unfilled cards (or a whole section the person switched off) do not become empty debts and goals.
+    onb.debts = onb.debts.filter(d => +d.balance > 0 || (onb.scen.debt && String(d.name).trim()));
+    onb.goals = onb.goals.filter(g => +g.target > 0 || (onb.scen.save && String(g.name).trim() && g.name !== 'Моя цель'));
     onb.debts.forEach((d, i) => { if (!String(d.name).trim()) d.name = onb.debts.length > 1 ? `Долг ${i + 1}` : 'Долг'; });
     onb.goals.forEach((g, i) => { if (!String(g.name).trim() || g.name === 'Моя цель') g.name = onb.goals.length > 1 ? `Цель ${i + 1}` : 'Цель'; });
     const wasStart = +S.debtStart || 0;
