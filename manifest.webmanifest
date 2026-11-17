@@ -1,0 +1,14 @@
+{
+  "name": "До зарплаты",
+  "short_name": "До зарплаты",
+  "description": "Сколько можно потратить сегодня, чтобы дотянуть до зарплаты и закрыть долг",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#121514",
+  "theme_color": "#121514",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
