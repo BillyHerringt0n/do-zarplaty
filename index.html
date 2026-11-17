@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://telegram.org https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://t.me https://*.telegram.org https://*.telesco.pe https://*.telegram-cdn.org; connect-src https://www.cbr-xml-daily.ru; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1/ybwT9JDFjBPnAVXGCoxQeYx3UFTnBEUGBazQ4576Q=' https://telegram.org/js/telegram-web-app.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://t.me https://*.telegram.org https://*.telesco.pe https://*.telegram-cdn.org; connect-src https://www.cbr-xml-daily.ru; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#121514">
 <title>До зарплаты</title>
@@ -96,7 +96,7 @@ main{max-width:1040px;margin:0 auto}
 .hero .big{font-size:clamp(52px,13vw,84px);line-height:.95;letter-spacing:-.04em;font-weight:500}
 .hero .big small{font-size:.34em;color:var(--muted);margin-left:6px;letter-spacing:0}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 10px;border-radius:999px;white-space:nowrap}
-.pill.ok{background:var(--accent-soft);color:var(--accent)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.ok{background:var(--accent-soft);color:var(--accent)} .pill.warn{background:var(--warn-soft);color:color-mix(in srgb,var(--warn) 65%,var(--ink))} .pill.bad{background:var(--bad-soft);color:var(--bad)}
 .pill svg{width:14px;height:14px}
 .segbar{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}
 .segbar i{height:10px;border-radius:3px;background:var(--sunk)}
@@ -245,6 +245,7 @@ input[type=range]{padding:0;background:transparent;border:0;accent-color:var(--a
 
 svg.chart{width:100%;height:auto;display:block}
 svg.chart text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
+@media (max-width:560px){ svg.chart text{font-size:15px} }
 .row.cat{display:grid;grid-template-columns:minmax(0,1fr) minmax(60px,1fr) auto;align-items:center}
 .catbar{height:6px;background:var(--sunk);border-radius:3px;overflow:hidden;display:block}
 .catbar>i{display:block;height:100%;background:var(--accent)}
@@ -309,7 +310,8 @@ button.danger.armed{background:var(--bad);color:var(--surface);border-color:var(
 .presets{display:flex;flex-wrap:wrap;gap:6px}
 body.onboarding .tabbar,body.onboarding .tabs,body.onboarding .topright{display:none!important}
 
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabbar) + 20px + var(--sab));z-index:7;background:var(--ink);color:var(--bg);padding:8px 8px 8px 16px;border-radius:999px;font-size:14px;max-width:calc(100% - 32px);display:flex;align-items:center;gap:10px}
+.toast{position:fixed;left:16px;right:16px;margin-inline:auto;width:max-content;bottom:calc(var(--tabbar) + 20px + var(--sab));z-index:7;background:var(--ink);color:var(--bg);padding:8px 8px 8px 16px;border-radius:16px;font-size:14px;max-width:min(520px, calc(100% - 32px));display:flex;align-items:center;gap:10px;line-height:1.35}
+.toast span{flex:1}
 .toast:not(:has(button)){padding-right:16px}
 .toast button{background:transparent;color:var(--bg);border-color:color-mix(in srgb,var(--bg) 35%,transparent);border-radius:999px;padding:4px 12px;font-size:13px}
 
@@ -531,7 +533,7 @@ function paintAva(el) {
   el.appendChild(img);
 }
 let ownCat = false, moreCats = false;
-let spendCat = '', incCur = 'USD', incKind = 'salary', moneyTab = 'spends';
+let spendCat = '', incCur = '', incKind = 'salary', moneyTab = 'spends';
 let editBal = false, editSpend = null, whatIf = 0, csvRows = null, csvDeduct = false;
 let onb = null, onbStep = 0;
 let shownCells = null;   // cells already drawn this visit, so only new ones animate
@@ -561,6 +563,7 @@ const CUR = { RUB: '₽', USD: '$', EUR: '€' };
 const rateOf = c => c === 'USD' ? +S.usdRate || 0 : c === 'EUR' ? +S.eurRate || 0 : 1;
 const toRub = (v, cur, rate) => (+v || 0) * (cur === 'USD' || cur === 'EUR' ? (+rate || rateOf(cur)) : 1);
 const money = (v, cur) => cur === 'USD' || cur === 'EUR' ? CUR[cur] + (+v || 0).toLocaleString('ru-RU') : rub(v);
+const fmtRate = x => String(Math.round(x * 100) / 100).replace('.', ',');
 function plural(n, a, b, c) { n = Math.abs(n) % 100; const n1 = n % 10; if (n > 10 && n < 20) return c; if (n1 > 1 && n1 < 5) return b; if (n1 === 1) return a; return c; }
 const daysW = n => `${n} ${plural(n,'день','дня','дней')}`;
 const monW = n => `${n} ${plural(n,'месяц','месяца','месяцев')}`;
@@ -569,7 +572,7 @@ let toastT;
 function toast(t, action) {
   const el = $('toast'); el.innerHTML = ''; const s = document.createElement('span'); s.textContent = t; el.appendChild(s);
   if (action) { const b = document.createElement('button'); b.textContent = action.label; b.onclick = () => { el.hidden = true; action.fn(); }; el.appendChild(b); }
-  el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, action ? 5000 : 2400);
+  el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, action ? 5000 : Math.min(5000, 2000 + t.length * 30));
 }
 let rev = 0;   // counts saved changes, so an undo can tell whether something else happened after it
 function undoable(msg, mutate) {
@@ -959,7 +962,7 @@ function renderNav() {
 function go(v) {
   if (v === 'income') v = 'money';
   if (!TABS.some(t => t[0] === v)) v = 'home';
-  view = v; if (location.hash.slice(1) !== v) history.replaceState(null, '', '#' + v);
+  view = v; editBal = false; if (location.hash.slice(1) !== v) history.replaceState(null, '', '#' + v);
   renderNav(); window.scrollTo(0, 0);
 }
 addEventListener('hashchange', () => { const h = location.hash.slice(1); if (h && h !== view) { view = TABS.some(t => t[0] === h) ? h : 'home'; renderNav(); } });
@@ -986,12 +989,12 @@ function spendRow(s, withDate) {
     </div>
     <div class="acts"><button type="button" data-edit-cancel="1">Отмена</button><button class="primary" type="submit">${ic('check')}Сохранить</button></div>
   </form>`;
-  return `<div class="li click"><span class="t" data-edit-spend="${s.id}" title="Изменить">${esc(s.cat)}${s.note ? `<small>${esc(s.note)}</small>` : withDate ? '' : '<small>нажми, чтобы изменить</small>'}</span>
-    <span class="num">${rub(s.amount)}</span><button class="ghost" data-del-spend="${s.id}" aria-label="Удалить">${ic('x')}</button></div>`;
+  return `<div class="li click"><span class="t" data-edit-spend="${s.id}" title="Изменить" role="button" tabindex="0">${esc(s.cat)}${s.note ? `<small>${esc(s.note)}</small>` : withDate ? '' : '<small>нажми, чтобы изменить</small>'}</span>
+    <span class="num">${rub(s.amount)}</span><button class="ghost" data-del-spend="${s.id}" aria-label="Удалить трату ${esc(s.cat)} ${rub(s.amount)}">${ic('x')}</button></div>`;
 }
 
 function renderHome() {
-  const c = calc(), st = status(c.perDay, c.free), p = progress();
+  const c = calc(), st = c.leftToday < 0 && c.perDay >= 0 ? ['bad', 'Перерасход сегодня'] : status(c.perDay, c.free), p = progress();
   const lim = Math.max(0, c.perDayToday);
   const used = lim > 0 ? c.spentTodayFree / lim : 1;
   const segCls = c.leftToday < 0 ? 'bad' : used > 0.75 ? 'warn' : '';
@@ -1029,13 +1032,13 @@ function renderHome() {
     <div class="stack">
       <div class="card hero">
         <div class="kv"><span class="label">Можно тратить сегодня</span><span class="pill ${st[0]}">${st[1]}</span></div>
-        <div class="big num ${c.leftToday < 0 ? 'neg' : ''}">${Math.round(c.leftToday).toLocaleString('ru-RU')}<small>₽</small></div>
+        <div class="big num ${c.leftToday < 0 ? 'neg' : ''}">${Math.round(c.leftToday).toLocaleString('ru-RU').replace('-', '−')}<small>₽</small></div>
         <p class="muted">из ${rub(lim)} на сегодня · до ${fmtD(c.target)} ещё ${daysW(c.days)}</p>
         <div class="segbar ${segCls}" aria-hidden="true">${segs}</div>
         ${c.leftToday < 0 ? `<div class="banner bad">${ic('alert')}<div><b>Перерасход ${rub(-c.leftToday)}</b><p class="note">Если сегодня больше не тратить, с завтра лимит будет ${rub(Math.max(0, c.nextDay))} в день.</p></div></div>` : ''}
         <div class="stats">
           <div><span class="s">${cardAvailMode() ? 'Доступно на карте' : payCardDebt() ? 'Свои деньги на жизнь' : 'На карте'}</span>
-            ${editBal && editBal !== 'card' ? `<form class="editbal" id="balForm"><input id="balNew" type="number" inputmode="decimal" step="any" value="${Math.round(S.balance)}" aria-label="Сколько сейчас на карте"><button class="primary" type="submit" aria-label="Сохранить">${ic('check')}</button></form>`
+            ${editBal && editBal !== 'card' ? `<form class="editbal" id="balForm"><input id="balNew" type="number" inputmode="decimal" step="any" value="${Math.round(S.balance)}" aria-label="Сколько сейчас на карте"><button class="primary" type="submit" aria-label="Сохранить">${ic('check')}</button><button type="button" data-editbal-cancel="1" aria-label="Отмена">${ic('x')}</button></form>`
               : `<span class="v num">${rub(S.balance)}</span><button class="linkbtn" data-editbal="1">${payCardDebt() && !cardAvailMode() ? 'изменить' : 'сверить с банком'}</button>`}</div>
           <div><span class="s">Свободно до ${fmtD(c.target)}</span><span class="v num ${c.free < 0 ? 'neg' : ''}">${rub(c.free)}</span></div>
           <div><span class="s">В день в среднем</span><span class="v num">${rub(Math.max(0, c.perDay))}</span></div>
@@ -1083,7 +1086,7 @@ function renderHome() {
       <div class="card">
         <h2>Как посчитано</h2>
         <div class="rows">
-          <div class="row"><span>На карте</span><span class="num">${rub(S.balance)}</span></div>
+          <div class="row"><span>${cardAvailMode() ? 'Доступно на карте' : payCardDebt() ? 'Свои деньги' : 'На карте'}</span><span class="num">${rub(S.balance)}</span></div>
           <div class="row"><span>Обязательные платежи</span><span class="num neg">${rub(-c.billsSum)}</span></div>
           ${c.habitRows.map(h => `<div class="row"><span>${esc(h.name)} <span class="tag">${h.n} шт.</span></span><span class="num neg">${rub(-h.sum)}</span></div>`).join('')}
           ${c.oneSum ? `<div class="row"><span>Разовые траты</span><span class="num neg">${rub(-c.oneSum)}</span></div>` : ''}
@@ -1096,7 +1099,7 @@ function renderHome() {
         <div class="tl">${c.events.map(e => `<div class="ev ${e.pay ? 'pay' : ''}${e.done ? ' done' : ''}">
           <span class="d">${fmtD(e.date)}</span>
           <span class="what">${esc(e.what)}${e.amount ? `<span class="num muted">${rub(e.amount)}</span>` : ''}${e.sub ? `<small>${e.sub}</small>` : ''}${e.one ? '<small>разовая</small>' : ''}${e.overdue ? '<small class="neg">дата прошла</small>' : ''}</span>
-          ${e.done ? `<button class="undo" data-unpay="${e.bill ? 'bill' : e.debt ? 'debt' : 'one'}" data-id="${(e.bill || e.debt || e.one).id}" data-key="${e.key || ''}" title="Отметить как неоплаченный">${ic('check')}Оплачено<span>отменить</span></button>` : e.bill ? `<button class="mark" data-pay="${e.bill.id}" data-key="${e.key}">${ic('circle')}<span class="bl">Отметить оплату</span></button>` : e.debt ? `<button class="mark" data-pay-debt="${e.debt.id}" data-key="${e.key}">${ic('circle')}<span class="bl">Отметить оплату</span></button>` : e.one ? `<button class="mark" data-pay-one="${e.one.id}">${ic('circle')}<span class="bl">Отметить оплату</span></button>` : '<span></span>'}
+          ${e.done ? `<button class="undo" data-unpay="${e.bill ? 'bill' : e.debt ? 'debt' : 'one'}" data-id="${(e.bill || e.debt || e.one).id}" data-key="${e.key || ''}" title="Отметить как неоплаченный">${ic('check')}Оплачено<span>отменить</span></button>` : e.bill ? `<button class="mark" data-pay="${e.bill.id}" data-key="${e.key}" aria-label="Отметить оплату: ${esc(e.what)}">${ic('circle')}<span class="bl">Отметить оплату</span></button>` : e.debt ? `<button class="mark" data-pay-debt="${e.debt.id}" data-key="${e.key}" aria-label="Отметить оплату: ${esc(e.what)}">${ic('circle')}<span class="bl">Отметить оплату</span></button>` : e.one ? `<button class="mark" data-pay-one="${e.one.id}">${ic('circle')}<span class="bl">Отметить оплату</span></button>` : '<span></span>'}
         </div>`).join('')}</div>
       </div>
     </div>
@@ -1104,6 +1107,7 @@ function renderHome() {
 }
 
 function renderMoney() {
+  if (!incCur) incCur = ([...S.entries].sort((a, b) => a.date < b.date ? -1 : 1).pop() || {}).cur || 'RUB';
   $('v-money').innerHTML = `
   <div class="vhead"><h1>Деньги</h1>
     <div class="seg" role="group" aria-label="Раздел">
@@ -1245,7 +1249,7 @@ function renderSummary() {
         ${line('Регулярные мелочи', cur.habits, prev.habits, false)}
         ${line('Обязательные и разовые', cur.fixed, prev.fixed, false)}
       </div>
-      <p class="note">Обязательные платежи попадают сюда, когда жмёшь «Оплатил».</p>
+      <p class="note">Обязательные платежи попадают сюда, когда отмечаешь оплату в «Что впереди».</p>
     </div>
     <div class="stack">
       <div class="card">
@@ -1311,7 +1315,7 @@ function cardLine() {
   }
   const avail = +cd.limit > 0 ? Math.max(0, cd.limit - cd.balance) : null;
   return `<div class="cardline">${ic('wallet')}<div><b>Кредитная карта «${esc(cd.name)}»: долг ${rub(cd.balance)}</b>${avail !== null ? `<span class="note"> · доступно ${rub(avail)} из ${rub(cd.limit)}</span>` : ''}
-    ${editBal === 'card' ? `<form class="editbal" id="cardForm" style="margin-top:6px"><input id="cardNew" type="number" inputmode="decimal" step="any" min="0" value="${Math.round(cd.balance * 100) / 100}" aria-label="Задолженность по карте из банка"><button class="primary" type="submit" aria-label="Сохранить">${ic('check')}</button></form>`
+    ${editBal === 'card' ? `<form class="editbal" id="cardForm" style="margin-top:6px"><input id="cardNew" type="number" inputmode="decimal" step="any" min="0" value="${Math.round(cd.balance * 100) / 100}" aria-label="Задолженность по карте из банка"><button class="primary" type="submit" aria-label="Сохранить">${ic('check')}</button><button type="button" data-editbal-cancel="1" aria-label="Отмена">${ic('x')}</button></form>`
       : `<p class="note">Траты увеличивают долг по карте, доходы на неё уменьшают. Кредитный лимит — не твои деньги, в дневной лимит он не входит. <button class="linkbtn" data-editbal="card">Сверить долг с банком</button></p>`}</div></div>`;
 }
 function cardInfo(d) {
@@ -1341,13 +1345,13 @@ function renderDebt() {
 function renderGoal(g) {
   const p = goalProgress(g), t = today0(), mo = +g.monthly || 0, months = mo > 0 && p.left > 0 ? Math.ceil(p.left / mo) : null;
   $('gBody').innerHTML = `
-  <p class="note">Каждая клетка — ${rub(p.cell)}</p>
+  ${+g.target > 0 ? `<p class="note">Каждая клетка — ${rub(p.cell)}</p>` : ''}
   <div class="cols">
     <div class="stack">
       <div class="card">
         <div class="kv" style="align-items:flex-end">
           <div><span class="label">Накоплено</span><div class="pct num">${Math.floor(p.pct)}<small>%</small></div></div>
-          <div style="text-align:right"><span class="label">Осталось</span><div class="num" style="font-size:22px">${rub(p.left)}</div><span class="note">из ${rub(p.target)}</span></div>
+          ${+g.target > 0 ? `<div style="text-align:right"><span class="label">Осталось</span><div class="num" style="font-size:22px">${rub(p.left)}</div><span class="note">из ${rub(p.target)}</span></div>` : ''}
         </div>
         ${ledger(p, false)}
         ${!(+g.target > 0) ? `<div class="banner">${ic('flag')}<div><b>Укажи сумму цели</b><p class="note">Тогда клетки начнут закрашиваться.</p></div></div>`
@@ -1390,8 +1394,9 @@ function renderDebtBody() {
     const done = p.pctAll >= m, next = !done && m === p.nextMile;
     return `<div class="mile-b ${done ? 'done' : next ? 'next' : ''}">${ic(m === 100 ? 'trophy' : 'flag')}<b>${m}%</b><span>${done ? 'пройдено' : next ? 'ещё ' + rub(p.toMile) : rub(m / 100 * p.start)}</span></div>`;
   }).join('');
+  const noDebt = !(+S.debtStart > 0) && totalDebt() <= 0;
   $('gBody').innerHTML = `
-  <p class="note">Каждая клетка — ${rub(p.cell)}</p>
+  ${noDebt ? '' : `<p class="note">Каждая клетка — ${rub(p.cell)}</p>`}
   <div class="cols">
     <div class="stack">
       <div class="card">
@@ -1403,7 +1408,8 @@ function renderDebtBody() {
         </div>
         ${ledger(p, false)}
         <div class="legend"><span><i class="paid"></i>погашено</span><span><i class="pot"></i>отложено, ждёт погашения</span><span><i></i>осталось</span></div>
-        ${p.toNext > 0 ? `<div class="banner">${ic('bolt')}<div><b>До следующей клетки ${rub(p.toNext)}</b><p class="note">Отложи столько, и закрасится ещё ${p.potCells + p.paidCells + 1}-я клетка из 100.</p></div></div>`
+        ${noDebt ? `<div class="banner">${ic('flag')}<div><b>Укажи сумму долга</b><p class="note">Впиши остаток в «Моих долгах», и клетки начнут закрашиваться по мере погашения.</p></div></div>`
+          : p.toNext > 0 ? `<div class="banner">${ic('bolt')}<div><b>До следующей клетки ${rub(p.toNext)}</b><p class="note">Отложи столько, и закрасится ещё ${p.potCells + p.paidCells + 1}-я клетка из 100.</p></div></div>`
           : `<div class="banner ok">${ic('trophy')}<div><b>Долг закрыт</b><p class="note">Все 100 клеток закрашены.</p></div></div>`}
         <div class="miles">${miles}</div>
       </div>
@@ -1419,7 +1425,7 @@ function renderDebtBody() {
           <div class="row"><span>Откладываю в месяц <span class="tag">${+S.planMonthly > 0 ? 'мой план' : ms.n ? `оценка по ${ms.n} ${plural(ms.n, 'зарплате', 'зарплатам', 'зарплатам')}` : 'плана нет'}</span></span><span class="num">${rub(ms.save)}</span></div>
           ${!(+S.planMonthly > 0) && ms.n >= 2 && ms.lo < ms.save ? `<div class="row"><span>Если каждый раз как в худшую зарплату <span class="tag">${rub(ms.lo)} в месяц</span></span><span class="num muted">${(m => isFinite(m) ? m + ' мес.' : 'не закроется')(simulate(ms.lo).months)}</span></div>` : ''}
           <div class="row"><span>${S.debts.filter(d => +d.min > 0).length > 1 ? 'Мин. платежи' : 'Мин. платёж'} в месяц <span class="tag">${S.debts.some(d => d.io && !(+d.apr > 0)) ? 'уходит на проценты' : 'гасит долг'}</span></span><span class="num">${rub(S.debts.reduce((a, d) => a + (+d.min || 0), 0))}</span></div>
-          ${payCardDebt() ? `<div class="row"><span>Траты с кредитки в месяц <span class="tag">по твоим записям, увеличивают долг</span></span>${cardDrain() === null ? `<span class="num muted">через 2 недели записей</span>` : `<span class="num neg">${rub(cardDrain())}</span>`}</div>` : ''}
+          ${payCardDebt() ? `<div class="row"><span>Траты с кредитки в месяц <span class="tag">по твоим записям, увеличивают долг</span></span>${cardDrain() === null ? `<span class="num muted">через 2 недели записей</span>` : `<span class="num ${cardDrain() > 0 ? 'neg' : 'muted'}">${rub(cardDrain())}</span>`}</div>` : ''}
           ${isFinite(base.months) && base.interest > 0 ? `<div class="row"><span>Откуда переплата <span class="tag">${S.debts.some(d => +d.apr > 0) ? 'проценты по ставке, пока долг гасится' : `мин. платёж × ${monW(base.months)}`}</span></span><span class="num neg">${rub(base.interest)}</span></div>` : ''}
           <div class="row"><span>Если платить только мин. платёж</span><span class="num muted">${isFinite(minOnly.months) ? minOnly.months + ' мес.' : 'не закроется'}</span></div>
           ${base.closes.length > 1 ? base.closes.map(cl => `<div class="row"><span>${esc(cl.name)} закроется</span><span class="num">${cl.m === 0 ? 'сразу' : monthName(t, cl.m)}</span></div>`).join('') : ''}
@@ -1463,8 +1469,8 @@ function renderDebtBody() {
       <div class="card">
         <h2>${ic('wallet')}Копилка на долг</h2>
         <div class="rows">
-          ${pi.eur ? `<div class="row"><span>В евро</span><span class="num">€${pi.eur.toLocaleString('ru-RU')} × ${S.eurRate} = ${rub(pi.eur * S.eurRate)}</span></div>` : ''}
-          ${pi.usd ? `<div class="row"><span>В долларах</span><span class="num">$${pi.usd.toLocaleString('ru-RU')} × ${S.usdRate} = ${rub(pi.usd * S.usdRate)}</span></div>` : ''}
+          ${pi.eur ? `<div class="row"><span>В евро</span><span class="num">€${pi.eur.toLocaleString('ru-RU')} × ${fmtRate(S.eurRate)} = ${rub(pi.eur * S.eurRate)}</span></div>` : ''}
+          ${pi.usd ? `<div class="row"><span>В долларах</span><span class="num">$${pi.usd.toLocaleString('ru-RU')} × ${fmtRate(S.usdRate)} = ${rub(pi.usd * S.usdRate)}</span></div>` : ''}
           ${pi.rubIn ? `<div class="row"><span>В рублях</span><span class="num">${rub(pi.rubIn)}</span></div>` : ''}
           ${S.potUsed ? `<div class="row"><span>Уже внесено в долг</span><span class="num">${rub(-S.potUsed)}</span></div>` : ''}
           <div class="row total"><span>Сейчас в копилке</span><span class="num pos">${rub(pi.pot)}</span></div>
@@ -1596,7 +1602,7 @@ function renderProfile() {
           <label class="unit"><input data-catlim="${esc(x)}" type="number" inputmode="decimal" min="0" value="${S.catLimits[x] || ''}" placeholder="без лимита" aria-label="Лимит ${esc(x)}"><span>₽</span></label>
           <button class="ghost" data-del-cat="${esc(x)}" aria-label="Убрать ${esc(x)}">${ic('x')}</button></div>`).join('')}</div>
         <form id="catForm" class="two" style="grid-template-columns:1fr auto">
-          <input id="catNew" maxlength="24" placeholder="Новая категория, например «Кафе»" aria-label="Новая категория">
+          <input id="catNew" maxlength="24" placeholder="Новая категория" aria-label="Новая категория">
           <button type="submit">${ic('plus')}Добавить</button>
         </form>
       </div>
@@ -1604,7 +1610,7 @@ function renderProfile() {
     <div class="stack">
       <div class="card">
         <div><h2>${ic('file')}Импорт выписки</h2><p class="note" style="margin-top:4px">Выгрузи историю операций из приложения банка и загрузи сюда: PDF, Excel, CSV, OFX или QIF. Списания станут тратами, повторы пропущу.</p></div>
-        ${csvRows ? csvPreview() : `<label class="btnlike" for="csvFile" style="align-self:flex-start">${ic('out')}Выбрать файл выписки</label>
+        ${csvRows ? csvPreview() : `<label class="btnlike" for="csvFile" style="align-self:flex-start" tabindex="0" role="button">${ic('out')}Выбрать файл выписки</label>
         <input id="csvFile" type="file" accept=".pdf,.xlsx,.xls,.csv,.txt,.ofx,.qif,application/pdf,text/csv,text/plain" hidden>`}
       </div>
       <div class="card">
@@ -1984,7 +1990,7 @@ function renderOnb() {
       <div class="kv"><input class="plain" data-goal="${g.id}" data-f="name" value="${esc(g.name === 'Моя цель' ? '' : g.name)}" placeholder="Название цели" aria-label="Название цели" style="flex:1"></div>
       <div class="fgrid">
         <label class="f"><span>Сколько нужно, ₽</span><input data-goal="${g.id}" data-f="target" type="number" inputmode="decimal" value="${g.target || ''}" placeholder="сумма цели"></label>
-        <label class="f"><span>План в месяц, ₽</span><input data-goal="${g.id}" data-f="monthly" type="number" inputmode="decimal" value="${g.monthly || ''}" placeholder="сколько откладывать"></label>
+        <label class="f"><span>План в месяц, ₽</span><input data-goal="${g.id}" data-f="monthly" type="number" inputmode="decimal" value="${g.monthly || ''}" placeholder="в месяц"></label>
       </div></div>`).join('')}</div>
     <button type="button" data-add="goal" style="align-self:flex-start">${ic('plus')}Ещё цель</button>`;
   if (cur === 'pay') body = head('Когда приходят деньги', 'До этой даты считается дневной лимит.') + `
@@ -2014,14 +2020,20 @@ function readOnb() {
 const parsePaydays = s => [...new Set(String(s).split(/[^\d]+/).map(Number).filter(n => n >= 1 && n <= 31))].sort((a,b)=>a-b);
 
 /* ---------- keep half-typed input across re-renders ---------- */
+const qs = sel => { try { return document.querySelector(sel); } catch (e) { return null; } };
 const KEEP = ['spCat', 'spAmt', 'spNote', 'spDate', 'inEarn', 'inSave', 'inDate', 'rpAmt', 'gdAmt', 'catNew'];
 function keep(fn) {
   return function (...a) {
     const v = {}; for (const id of KEEP) { const el = $(id); if (el) v[id] = el.value; }
-    const act = document.activeElement && document.activeElement.id;
+    const ae = document.activeElement, act = ae && ae.id;
+    // A field without an id is found again by its data attributes (data-bill="…" data-f="amount" and the like).
+    const sig = ae && ae !== document.body && !act && ae.attributes ? [...ae.attributes].filter(x => /^data-(bill|debt|goal|habit|one|q|set|catlim|f|pay)$/.test(x.name)).map(x => `[${x.name}="${String(x.value).replace(/["\\]/g, '\\$&')}"]`).join('') : '';
+    const box = qs('.csvbox'), boxTop = box ? box.scrollTop : 0;
     const r = fn.apply(this, a);
     for (const id in v) { const el = $(id); if (el && v[id] !== '') el.value = v[id]; }
     if (act && KEEP.includes(act)) { const el = $(act); if (el && document.activeElement !== el) el.focus(); }
+    else if (sig) { const el = qs((ae.tagName || '').toLowerCase() + sig); if (el && document.activeElement !== el) try { el.focus({ preventScroll: true }); } catch (x) {} }
+    const box2 = qs('.csvbox'); if (box2 && boxTop) box2.scrollTop = boxTop;
     updFree();
     return r;
   };
@@ -2185,7 +2197,7 @@ function addSpend(amount, cat, date, note) {
   S.spends.push(sp); if (S.spends.length > MAX_SPENDS) S.spends = S.spends.slice(-MAX_SPENDS);
   S.balance -= amount;
   commit();
-  toast(`Записал ${rub(amount)}, ${cat.toLowerCase()}`, { label: 'Отменить', fn: () => { S.spends = S.spends.filter(x => x.id !== sp.id); S.balance += amount; commit('Отменил'); } });
+  toast(`Записал ${rub(amount)} в «${cat}»`, { label: 'Вернуть', fn: () => { S.spends = S.spends.filter(x => x.id !== sp.id); S.balance += amount; commit('Отменил'); } });
 }
 document.addEventListener('submit', e => {
   e.preventDefault();
@@ -2204,6 +2216,7 @@ document.addEventListener('submit', e => {
   if (f.dataset.editForm) {
     const s = S.spends.find(x => x.id === f.dataset.editForm); if (!s) return;
     const fd = new FormData(f), na = +fd.get('amount') || 0, tk = ymd(today0());
+    if (!(na > 0)) { toast('Впиши сумму больше нуля'); return; }
     S.balance += (+s.amount || 0) - na;
     s.amount = na; s.cat = fd.get('cat'); const note = String(fd.get('note') || '').trim().slice(0, 60);
     if (note) s.note = note; else delete s.note;
@@ -2223,7 +2236,7 @@ document.addEventListener('submit', e => {
     cardMark(); commit(+cd.limit > 0 ? `Доступно ${rub(S.balance)}, долг по карте ${rub(cd.balance)}` : 'Сумма на жизнь обновлена'); return;
   }
   if (f.id === 'balForm') {
-    const v = $('balNew').value; if (v === '') return;
+    const v = $('balNew').value; if (v === '') { editBal = false; render(); return; }
     const nb = isFinite(+v) ? +v : 0, diff = nb - S.balance; editBal = false;
     if (Math.abs(diff) < 1) { S.balance = nb; commit('Всё сходится с банком'); }
     else if (diff < 0) undoable(`Нашёл незаписанные траты: ${rub(-diff)}`, () => {
@@ -2245,7 +2258,7 @@ document.addEventListener('submit', e => {
     const before = goalProgress(g).paidCells;
     g.extra = (+g.extra || 0) + a; S.balance -= a; $('gdAmt').value = '';
     const diff = goalProgress(g).paidCells - before;
-    commit(diff > 0 ? `Закрашено ещё ${diff} ${plural(diff,'клетка','клетки','клеток')}` : `Отложено ${rub(a)}`);
+    commit(diff > 0 ? `${plural(diff, 'Закрашена', 'Закрашено', 'Закрашено')} ещё ${diff} ${plural(diff,'клетка','клетки','клеток')}` : `Отложено ${rub(a)}`);
   }
   if (f.id === 'catForm') {
     const v = $('catNew').value.trim().slice(0, 24); if (!v) return;
@@ -2261,7 +2274,7 @@ document.addEventListener('submit', e => {
     const own = S.payCard === d.id, fromPot = Math.min(pay, potInfo().pot), fromCard = own ? 0 : pay - fromPot;
     d.balance = Math.max(0, (+d.balance || 0) - pay); S.potUsed = (+S.potUsed || 0) + fromPot; S.balance -= fromCard;
     const after = progress().paidCells, src = fromCard > 0 ? ` (из копилки ${rub(fromPot)}, с карты ${rub(fromCard)})` : '';
-    commit((after > before ? `Закрашено ещё ${after - before} ${plural(after - before,'клетка','клетки','клеток')}` : `Долг меньше на ${rub(pay)}`) + src);
+    commit((after > before ? `${plural(after - before, 'Закрашена', 'Закрашено', 'Закрашено')} ещё ${after - before} ${plural(after - before,'клетка','клетки','клеток')}` : `Долг меньше на ${rub(pay)}`) + src);
   }
 });
 let wipeT;
@@ -2332,6 +2345,7 @@ document.addEventListener('click', e => {
     const g = { id: uid(), name: onb ? 'Моя цель' : 'Новая цель', target: 0, monthly: 0, extra: 0 };
     (onb || S).goals.push(g); if (onb) render(); else { goalTab = g.id; commit(); } return;
   }
+  if (d.editbalCancel) { editBal = false; render(); return; }
   if (d.editbal) { editBal = d.editbal === 'card' ? 'card' : 'own'; if (view !== 'home') go('home'); renderHome(); const i = $('balNew'); if (i && i.focus) { i.focus(); i.select(); } return; }
   if (d.unpay) {
     const t = d.unpay, id = d.id, key = d.key || '';
@@ -2404,7 +2418,7 @@ document.addEventListener('click', e => {
   }
   if (d.csvGo) {
     const on = csvRows.filter(r => r.on); const sum = on.reduce((a, r) => a + r.amount, 0);
-    undoable(`Добавлено ${on.length} ${plural(on.length,'трата','траты','трат')}`, () => {
+    undoable(`${plural(on.length, 'Добавлена', 'Добавлено', 'Добавлено')} ${on.length} ${plural(on.length,'трата','траты','трат')}`, () => {
       for (const r of on) S.spends.push({ id: uid(), date: r.date, amount: r.amount, cat: r.cat, ...(r.desc ? { note: String(r.desc).slice(0, 60) } : {}), ...(r.bank && r.cat === BANK_CAT ? { planned: true } : {}) });
       if (csvDeduct) S.balance -= sum;
       csvRows = null; csvMeta = null;
@@ -2447,9 +2461,15 @@ document.addEventListener('click', e => {
     S = clone(DEFAULT); commit(); startOnb(); return;
   }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('cele').hidden) { $('cele').hidden = true; return; } const c = e.target.closest?.('.card.link'); if (c && (e.key === 'Enter' || e.key === ' ') && e.target === c) { e.preventDefault(); if (c.dataset.goal) { goalTab = c.dataset.goal; renderDebt(); } go(c.dataset.go); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('cele').hidden) { $('cele').hidden = true; return; }
+  if (e.key === 'Escape' && (editBal || editSpend)) { editBal = false; editSpend = null; render(); return; }
+  // Keyboard: a spend opens with Enter; file pickers drawn as buttons open with Enter or Space.
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[data-edit-spend], label.btnlike[for]')) { e.preventDefault(); e.target.click(); return; } const c = e.target.closest?.('.card.link'); if (c && (e.key === 'Enter' || e.key === ' ') && e.target === c) { e.preventDefault(); if (c.dataset.goal) { goalTab = c.dataset.goal; renderDebt(); } go(c.dataset.go); } });
 // Tapping a filled number field selects it, so typing replaces the value instead of appending to it.
-document.addEventListener('focusin', e => { const t = e.target; if (t && t.tagName === 'INPUT' && t.type === 'number' && t.value !== '') setTimeout(() => { try { t.select(); } catch (x) {} }, 0); });
+document.addEventListener('focusin', e => { const t = e.target; if (t && t.tagName === 'INPUT' && t.type === 'number' && t.value !== '') { t.dataset.sel = '1'; setTimeout(() => { try { t.select(); } catch (x) {} }, 0); } });
+// The mouseup/touch that gave the focus would put the caret back: the first one after focusing selects instead.
+document.addEventListener('mouseup', e => { const t = e.target; if (t && t.dataset && t.dataset.sel) { e.preventDefault(); delete t.dataset.sel; try { t.select(); } catch (x) {} } }, true);
+document.addEventListener('focusout', e => { if (e.target && e.target.dataset) delete e.target.dataset.sel; });
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'inEarn' || t.id === 'inSave') updFree();
@@ -2536,7 +2556,7 @@ async function fetchRates(manual) {
     if (!(u > 0 && u < 1e5 && e > 0 && e < 1e5)) throw new Error('bad rates');
     S.usdRate = Math.round(u * 100) / 100; S.eurRate = Math.round(e * 100) / 100; S.ratesAt = ymd(today0()); S.ratesAuto = true; rateFail = false;
     if (onb && !(onb.ratesAt && !onb.ratesAuto)) Object.assign(onb, { usdRate: S.usdRate, eurRate: S.eurRate, ratesAt: S.ratesAt, ratesAuto: true });
-    commit(manual ? `Курсы обновлены: $ ${S.usdRate}, € ${S.eurRate}` : undefined);
+    commit(manual ? `Курсы обновлены: $ ${fmtRate(S.usdRate)}, € ${fmtRate(S.eurRate)}` : undefined);
   } catch (err) {
     rateFail = true;
     document.querySelectorAll('[data-rateinfo]').forEach(el => el.textContent = rateInfo());
