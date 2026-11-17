@@ -166,7 +166,7 @@ main{max-width:1040px;margin:0 auto}
 .ev .d{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
 .ev .what{min-width:0}
 .ev .what small{display:block;font-size:12px;color:var(--muted)}
-.ev .what .num{white-space:nowrap}
+.ev .what .num{display:block;white-space:nowrap;font-size:13px;margin-top:2px}
 .ev.pay .what{color:var(--accent);font-weight:500}
 .tag{font-size:11px;color:var(--muted);margin-left:6px}
 
@@ -964,7 +964,7 @@ function renderHome() {
         <h2>Что впереди</h2>
         <div class="tl">${c.events.map(e => `<div class="ev ${e.pay ? 'pay' : ''}${e.done ? ' done' : ''}">
           <span class="d">${fmtD(e.date)}</span>
-          <span class="what">${esc(e.what)}${e.amount ? ` <span class="num muted">${rub(e.amount)}</span>` : ''}${e.sub ? `<small>${e.sub}</small>` : ''}${e.one ? '<small>разовая</small>' : ''}${e.overdue ? '<small class="neg">дата прошла</small>' : ''}</span>
+          <span class="what">${esc(e.what)}${e.amount ? `<span class="num muted">${rub(e.amount)}</span>` : ''}${e.sub ? `<small>${e.sub}</small>` : ''}${e.one ? '<small>разовая</small>' : ''}${e.overdue ? '<small class="neg">дата прошла</small>' : ''}</span>
           ${e.done ? `<button class="undo" data-unpay="${e.bill ? 'bill' : e.debt ? 'debt' : 'one'}" data-id="${(e.bill || e.debt || e.one).id}" data-key="${e.key || ''}" title="Отметить как неоплаченный">${ic('check')}Оплачено<span>отменить</span></button>` : e.bill ? `<button class="mark" data-pay="${e.bill.id}" data-key="${e.key}">${ic('circle')}Отметить оплату</button>` : e.debt ? `<button class="mark" data-pay-debt="${e.debt.id}" data-key="${e.key}">${ic('circle')}Отметить оплату</button>` : e.one ? `<button class="mark" data-pay-one="${e.one.id}">${ic('circle')}Отметить оплату</button>` : '<span></span>'}
         </div>`).join('')}</div>
       </div>
