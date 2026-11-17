@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-IzV1E92/1NCgwTwpFRHEZI8Us5COBwiJdBkVMQERDqQ=' https://telegram.org/js/telegram-web-app.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://t.me https://*.telegram.org https://*.telesco.pe https://*.telegram-cdn.org; connect-src https://www.cbr-xml-daily.ru; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CNmy5D+nRt9XCYzB9VjOrK/71aDr9DCV1CGEdnrwjzc=' https://telegram.org/js/telegram-web-app.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://t.me https://*.telegram.org https://*.telesco.pe https://*.telegram-cdn.org; connect-src https://www.cbr-xml-daily.ru; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#121514">
 <title>До зарплаты</title>
@@ -600,7 +600,8 @@ function sanitize(s) {
   if (s.cele && typeof s.cele === 'object') { const g = {}; for (const k of Object.keys(s.cele.goals || {}).slice(0, 20)) g[sid(k)] = snum(s.cele.goals[k], 0, 100); s.cele = { debt: snum(s.cele.debt, 0, 100), goals: g }; } else s.cele = null; s.skip = Math.round(snum(s.skip, 0, 2));
   s.planMonthly = snum(s.planMonthly); s.potUsed = snum(s.potUsed); s.reserve = snum(s.reserve); s.debtStart = snum(s.debtStart);
   s.paydays = [...new Set((Array.isArray(s.paydays) ? s.paydays : []).map(Number).filter(n => n >= 1 && n <= 31))].slice(0, 8);
-  s.payMode = ['days', 'weekly', 'biweekly', 'manual'].includes(s.payMode) ? s.payMode : 'days';
+  s.payMode = ['monthly', 'days', 'weekly', 'biweekly', 'manual'].includes(s.payMode) ? s.payMode : 'days';
+  if (s.payMode === 'monthly') s.paydays = s.paydays.slice(0, 1);
   s.payWeekday = Math.round(snum(s.payWeekday, 0, 6)); s.payAnchor = sdate(s.payAnchor); s.payNext = sdate(s.payNext);
   s.cats = [...new Set((Array.isArray(s.cats) ? s.cats : []).map(c => sstr(c, 24).trim()).filter(Boolean))].slice(0, 30);
   const cl = {}; for (const k of Object.keys(s.catLimits || {}).slice(0, 60)) { const v = snum(s.catLimits[k]), key = sstr(k, 24); if (v > 0 && !BAD_KEY.test(key)) cl[key] = v; } s.catLimits = cl;
@@ -724,7 +725,7 @@ function paydaysAfter(t, count) {
   }
   return paydaysByDays(t, count);
 }
-function payPerMonth() { const m = S.payMode || 'days'; return m === 'weekly' ? 4.33 : m === 'biweekly' ? 2.17 : m === 'manual' ? 1 : Math.max(1, (S.paydays || []).length); }
+function payPerMonth() { const m = S.payMode || 'days'; return m === 'weekly' ? 4.33 : m === 'biweekly' ? 2.17 : m === 'manual' || m === 'monthly' ? 1 : Math.max(1, (S.paydays || []).length); }
 function periodStart(t) {
   const m = S.payMode || 'days';
   if (m === 'weekly' || m === 'biweekly') return addDays(paydaysAfter(t, 1)[0], m === 'weekly' ? -7 : -14);
@@ -935,8 +936,9 @@ function goalSelect() {
 function payFields(o) {
   const m = o.payMode || 'days';
   const WD = [[1, 'Пн'], [2, 'Вт'], [3, 'Ср'], [4, 'Чт'], [5, 'Пт'], [6, 'Сб'], [0, 'Вс']];
-  return `<div class="f full"><span>Доход приходит</span><div class="chips" role="group" aria-label="Как приходит доход">${[['days', 'По числам месяца'], ['weekly', 'Каждую неделю'], ['biweekly', 'Раз в две недели'], ['manual', 'Нерегулярно']].map(([k, v]) => `<button type="button" class="chip" data-paymode="${k}" aria-pressed="${m === k}">${v}</button>`).join('')}</div></div>` +
-    (m === 'days' ? `<label class="f"><span>Числа месяца</span><input data-pay="paydays" inputmode="numeric" value="${(o.paydays || []).join(', ')}" placeholder="например, 10 и 25"></label>`
+  return `<div class="f full"><span>Доход приходит</span><div class="chips" role="group" aria-label="Как приходит доход">${[['monthly', 'Раз в месяц'], ['days', 'Несколько раз в месяц'], ['biweekly', 'Раз в две недели'], ['manual', 'Нерегулярно'], ...(m === 'weekly' ? [['weekly', 'Каждую неделю']] : [])].map(([k, v]) => `<button type="button" class="chip" data-paymode="${k}" aria-pressed="${m === k}">${v}</button>`).join('')}</div></div>` +
+    (m === 'monthly' ? `<label class="f"><span>Какого числа</span><input data-pay="paydays" inputmode="numeric" value="${(o.paydays || []).slice(0, 1).join('')}" placeholder="например, 10"></label>`
+    : m === 'days' ? `<label class="f"><span>Числа месяца</span><input data-pay="paydays" inputmode="numeric" value="${(o.paydays || []).join(', ')}" placeholder="например, 10 и 25"></label>`
     : m === 'weekly' ? `<div class="f full"><span>День недели</span><div class="chips" role="group" aria-label="День недели">${WD.map(([k, v]) => `<button type="button" class="chip" data-payweekday="${k}" aria-pressed="${+o.payWeekday === k}">${v}</button>`).join('')}</div></div>`
     : m === 'biweekly' ? `<label class="f"><span>Дата любой из зарплат</span><input data-pay="payAnchor" type="date" value="${esc(o.payAnchor || '')}"></label>`
     : `<label class="f"><span>Следующий доход жду</span><input data-pay="payNext" type="date" value="${esc(o.payNext || '')}"></label>`);
@@ -2308,7 +2310,7 @@ document.addEventListener('click', e => {
   if (d.gtab) { goalTab = d.gtab; renderDebt(); return; }
   if (d.paymode || d.payweekday !== undefined) {
     const P = onb || S; if (onb) readOnb();
-    if (d.paymode) P.payMode = d.paymode; else P.payWeekday = +d.payweekday;
+    if (d.paymode) { P.payMode = d.paymode; if (P.payMode === 'monthly') P.paydays = (P.paydays || []).slice(0, 1); } else P.payWeekday = +d.payweekday;
     if (P.payMode === 'manual') P.skip = 0;
     if (onb) render(); else commit('Сохранено'); return;
   }
@@ -2434,8 +2436,8 @@ document.addEventListener('click', e => {
     if (+d.onbStep < 0) { onbStep--; render(); return; }
     if (onbSteps()[onbStep] === 'pay') {
       const pm = onb.payMode || 'days';
-      const el = document.querySelector('[data-pay="paydays"]'); if (el && pm === 'days') onb.paydays = parsePaydays(el.value);
-      if (pm === 'days' && !(onb.paydays || []).length) { toast('Укажи, каким числом приходит зарплата'); return; }
+      const el = document.querySelector('[data-pay="paydays"]'); if (el && (pm === 'days' || pm === 'monthly')) onb.paydays = parsePaydays(el.value).slice(0, pm === 'monthly' ? 1 : 8);
+      if ((pm === 'days' || pm === 'monthly') && !(onb.paydays || []).length) { toast('Укажи, каким числом приходит зарплата'); return; }
       if (pm === 'biweekly' && !onb.payAnchor) { toast('Укажи дату любой из зарплат'); return; }
       if (pm === 'manual' && !onb.payNext) { toast('Укажи, когда ждёшь следующий доход'); return; }
     }
@@ -2515,7 +2517,7 @@ document.addEventListener('change', e => {
   if (t.dataset.pay) {
     const k = t.dataset.pay; if (onb) readOnb();
     if (k === 'paydays' && !parsePaydays(t.value).length) { toast('Укажи хотя бы одно число месяца, например 1 или 10, 25'); t.value = (T.paydays || []).join(', '); return; }
-    T[k] = k === 'paydays' ? parsePaydays(t.value) : k === 'payWeekday' ? +t.value : t.value;
+    T[k] = k === 'paydays' ? parsePaydays(t.value).slice(0, T.payMode === 'monthly' ? 1 : 8) : k === 'payWeekday' ? +t.value : t.value;
     if (T.payMode === 'manual') T.skip = 0;
     if (onb) render(); else commit('Сохранено');
   }
