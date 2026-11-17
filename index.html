@@ -822,10 +822,26 @@ function monthlySave() {
   const auto = avg * ppm;
   return { auto, save: +S.planMonthly > 0 ? +S.planMonthly : auto, n: vals.length, lo: vals.length ? Math.min(...vals) * ppm : 0 };
 }
+// How much living on the credit card adds to its debt in a month: average everyday spending over the
+// recorded period (up to 60 days) minus the free income put on the card. With under two weeks of records,
+// the daily limit stands in for real spending.
+function cardDrain() {
+  if (!payCardDebt()) return 0;
+  const t = today0(), tk = ymd(t), from = ymd(addDays(t, -60));
+  const sp = S.spends.filter(x => !x.planned && x.date >= from && x.date <= tk);
+  const first = sp.reduce((a, x) => x.date < a ? x.date : a, tk), span = Math.max(1, diffDays(parse(first), t) + 1);
+  const freeIn = S.entries.filter(e => e.date >= first && e.date <= tk).reduce((a, e) => a + toRub(e.free, e.cur, e.rate), 0) / Math.max(span, 14) * 30.4;
+  const spend = span >= 14 && sp.length >= 5 ? sp.reduce((a, x) => a + (+x.amount || 0), 0) / span * 30.4 : Math.max(0, calc().perDay) * 30.4;
+  return Math.max(0, Math.round(spend - freeIn));
+}
 // Interest comes from the rate; a debt marked "interest only" without a rate charges exactly its minimum.
-// Only savings reduce principal; a closed debt's minimum rolls over to the next one.
+// Only savings reduce principal; a closed debt's minimum rolls over to the next one. The card being paid
+// with grows by the month's spending until it is closed, and its minimum is paid from the savings too,
+// since topping that card up is the only way to pay it.
 function simulate(extra, applyPot = true) {
-  const ds = S.debts.map(d => ({ id: d.id, name: d.name, bal: Math.max(0, +d.balance || 0), r: (+d.apr || 0) / 1200, min: +d.min || 0, apr: +d.apr || 0, io: !!d.io })).filter(d => d.bal > 0);
+  const drain = cardDrain();
+  const ds = S.debts.map(d => ({ id: d.id, name: d.name, bal: Math.max(0, +d.balance || 0), r: (+d.apr || 0) / 1200, min: +d.min || 0, apr: +d.apr || 0, io: !!d.io,
+    pay: d.id === S.payCard && d.kind === 'card', limit: +d.limit > 0 ? +d.limit : Infinity })).filter(d => d.bal > 0);
   const order = () => priorityOrder(ds.filter(d => d.bal > 0).map(d => ({ ...d, balance: d.bal })));
   let pot = applyPot ? potInfo().pot : 0;
   for (const o of order()) { const d = ds.find(x => x.id === o.id); const p = Math.min(pot, d.bal); d.bal -= p; pot -= p; }
@@ -835,9 +851,11 @@ function simulate(extra, applyPot = true) {
     m++;
     let pool = extra;
     for (const d of ds) {
-      if (d.bal <= 0) { pool += d.min; continue; }
+      if (d.bal <= 0) { if (!d.pay) pool += d.min; continue; }
+      if (d.pay && drain) d.bal = Math.min(d.limit, d.bal + drain);
       const interest = d.r > 0 ? d.bal * d.r : d.io ? d.min : 0;
       interestTotal += interest; d.bal += interest;
+      if (d.pay) { const pay = Math.max(0, Math.min(d.bal, d.min, pool)); d.bal -= pay; pool -= pay; continue; }
       const pay = Math.min(d.bal, d.min); d.bal -= pay; pool += d.min - pay;
     }
     for (const o of order()) { const d = ds.find(x => x.id === o.id); const p = Math.min(pool, d.bal); d.bal -= p; pool -= p; if (d.bal <= 0.5) { d.bal = 0; closes.push({ name: d.name, m }); } }
@@ -1374,6 +1392,7 @@ function renderDebtBody() {
           <div class="row"><span>Откладываю в месяц <span class="tag">${+S.planMonthly > 0 ? 'мой план' : ms.n ? `оценка по ${ms.n} ${plural(ms.n, 'зарплате', 'зарплатам', 'зарплатам')}` : 'плана нет'}</span></span><span class="num">${rub(ms.save)}</span></div>
           ${!(+S.planMonthly > 0) && ms.n >= 2 && ms.lo < ms.save ? `<div class="row"><span>Если каждый раз как в худшую зарплату <span class="tag">${rub(ms.lo)} в месяц</span></span><span class="num muted">${(m => isFinite(m) ? m + ' мес.' : 'не закроется')(simulate(ms.lo).months)}</span></div>` : ''}
           <div class="row"><span>${S.debts.filter(d => +d.min > 0).length > 1 ? 'Мин. платежи' : 'Мин. платёж'} в месяц <span class="tag">${S.debts.some(d => d.io && !(+d.apr > 0)) ? 'уходит на проценты' : 'гасит долг'}</span></span><span class="num">${rub(S.debts.reduce((a, d) => a + (+d.min || 0), 0))}</span></div>
+          ${payCardDebt() ? `<div class="row"><span>Траты с кредитки в месяц <span class="tag">по твоим записям, увеличивают долг</span></span><span class="num neg">${rub(cardDrain())}</span></div>` : ''}
           ${isFinite(base.months) && base.interest > 0 ? `<div class="row"><span>Откуда переплата <span class="tag">${S.debts.some(d => +d.apr > 0) ? 'проценты по ставке, пока долг гасится' : `мин. платёж × ${monW(base.months)}`}</span></span><span class="num neg">${rub(base.interest)}</span></div>` : ''}
           <div class="row"><span>Если платить только мин. платёж</span><span class="num muted">${isFinite(minOnly.months) ? minOnly.months + ' мес.' : 'не закроется'}</span></div>
           ${base.closes.length > 1 ? base.closes.map(cl => `<div class="row"><span>${esc(cl.name)} закроется</span><span class="num">${cl.m === 0 ? 'сразу' : monthName(t, cl.m)}</span></div>`).join('') : ''}
